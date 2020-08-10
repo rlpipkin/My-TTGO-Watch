@@ -49,9 +49,6 @@ void pmu_setup( TTGOClass *ttgo ) {
 
     pinMode( AXP202_INT, INPUT );
     attachInterrupt( AXP202_INT, &pmu_irq, FALLING );
-
-    // Turn off bluetooth
-    btStop();
 }
 
 /*
@@ -72,20 +69,24 @@ void pmu_standby( void ) {
     TTGOClass *ttgo = TTGOClass::getWatch();
 
     ttgo->power->clearTimerStatus();
-    if ( ttgo->power->isChargeing() ) {
-        ttgo->power->setTimer( 10 );
-    }
-    else {
-        ttgo->power->setTimer( 60 );
+    if ( pmu_get_silence_wakeup() ) {
+        if ( ttgo->power->isChargeing() || ttgo->power->isVBUSPlug() ) {
+            ttgo->power->setTimer( 3 );
+            log_i("enable silence wakeup timer, 3min");
+        }
+        else {
+            ttgo->power->setTimer( 60 );
+            log_i("enable silence wakeup timer, 60min");
+        }
     }
 
     if ( pmu_get_experimental_power_save() ) {
         ttgo->power->setDCDC3Voltage( 2700 );
-        log_i("enable 2.7V standby voltage");
+        log_i("go standby, enable 2.7V standby voltage");
     } 
     else {
         ttgo->power->setDCDC3Voltage( 3000 );
-        log_i("enable 3.0V standby voltage");
+        log_i("go standby, enable 3.0V standby voltage");
     }
     ttgo->power->setPowerOutPut(AXP202_LDO3, AXP202_OFF );
 }
@@ -95,11 +96,11 @@ void pmu_wakeup( void ) {
 
     if ( pmu_get_experimental_power_save() ) {
         ttgo->power->setDCDC3Voltage( 3000 );
-        log_i("enable 3.0V voltage");
+        log_i("go wakeup, enable 3.0V voltage");
     } 
     else {
         ttgo->power->setDCDC3Voltage( 3300 );
-        log_i("enable 3.3V voltage");
+        log_i("go wakeup, enable 3.3V voltage");
     }
 
     ttgo->power->clearTimerStatus();
@@ -143,6 +144,14 @@ void pmu_read_config( void ) {
   }
 }
 
+bool pmu_get_silence_wakeup( void ) {
+    return( pmu_config.silence_wakeup );
+}
+
+void pmu_set_silence_wakeup( bool value ) {
+    pmu_config.silence_wakeup = value;
+    pmu_save_config();
+}
 
 bool pmu_get_calculated_percent( void ) {
     return( pmu_config.compute_percent );
@@ -174,6 +183,11 @@ void pmu_loop( TTGOClass *ttgo ) {
      */
     if ( xEventGroupGetBitsFromISR( pmu_event_handle ) & PMU_EVENT_AXP_INT ) {
         setCpuFrequencyMhz(240);
+        if ( powermgm_get_event( POWERMGM_PMU_BATTERY | POWERMGM_PMU_BUTTON | POWERMGM_STANDBY_REQUEST ) ) {
+            ttgo->power->clearIRQ();
+            xEventGroupClearBits( pmu_event_handle, PMU_EVENT_AXP_INT );            
+            return;
+        }
         
         ttgo->power->readIRQ();
         if (ttgo->power->isVbusPlugInIRQ()) {
