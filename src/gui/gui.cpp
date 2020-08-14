@@ -40,6 +40,7 @@
 #include "mainbar/setup_tile/time_settings/time_settings.h"
 #include "mainbar/setup_tile/update/update.h"
 #include "mainbar/setup_tile/wlan_settings/wlan_settings.h"
+#include "mainbar/setup_tile/bluetooth_settings/bluetooth_settings.h"
 
 #include "hardware/powermgm.h"
 #include "hardware/display.h"
@@ -72,8 +73,9 @@ void gui_setup(void)
     battery_settings_tile_setup();
     display_settings_tile_setup();
     move_settings_tile_setup();
-    time_settings_tile_setup();
     wlan_settings_tile_setup();
+    bluetooth_settings_tile_setup();
+    time_settings_tile_setup();
     update_tile_setup();
 
     statusbar_setup();
@@ -89,11 +91,6 @@ void gui_setup(void)
  */
 void gui_loop( TTGOClass *ttgo ) {
     // if we run in silence mode    
-    if ( powermgm_get_event( POWERMGM_SILENCE_WAKEUP ) &&!powermgm_get_event( POWERMGM_STANDBY ) ) {
-        log_e("error while silence standby");
-        while(1);
-    }
-
     if ( powermgm_get_event( POWERMGM_SILENCE_WAKEUP ) ) {
         if ( lv_disp_get_inactive_time(NULL) < display_get_timeout() * 1000 ) {
             lv_task_handler();

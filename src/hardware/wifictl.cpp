@@ -27,6 +27,7 @@
 
 #include "powermgm.h"
 #include "wifictl.h"
+#include "json_psram_allocator.h"
 
 #include "gui/statusbar.h"
 #include "webserver/webserver.h"
@@ -67,8 +68,7 @@ void wifictl_setup( void ) {
       wifictl_networklist[ entry ].password[ 0 ] = '\0';
     }
 
-    // load network list from spiff
-    wifictl_load_network();
+    // load config from spiff
     wifictl_load_config();
 
     // register WiFi events
@@ -173,7 +173,7 @@ void wifictl_setup( void ) {
 
     xTaskCreate(  wifictl_Task,    /* Function to implement the task */
                   "wifictl Task",       /* Name of the task */
-                  5000,                  /* Stack size in words */
+                  2000,                  /* Stack size in words */
                   NULL,                   /* Task input parameter */
                   1,                      /* Priority of the task */
                   &_wifictl_Task );       /* Task handle. */
@@ -185,36 +185,91 @@ void wifictl_setup( void ) {
  *
  */
 void wifictl_save_config( void ) {
-  fs::File file = SPIFFS.open( WIFICTL_CONFIG_FILE, FILE_WRITE );
+    if ( SPIFFS.exists( WIFICTL_CONFIG_FILE ) ) {
+        SPIFFS.remove( WIFICTL_CONFIG_FILE );
+        log_i("remove old binary wificfg config");
+    }
+    if ( SPIFFS.exists( WIFICTL_LIST_FILE ) ) {
+        SPIFFS.remove( WIFICTL_LIST_FILE );
+        log_i("remove old binary wifilist config");
+    }
 
-  if ( !file ) {
-    log_e("Can't save file: %s", WIFICTL_CONFIG_FILE );
-  }
-  else {
-    file.write( (uint8_t *)&wifictl_config, sizeof( wifictl_config ) );
+    fs::File file = SPIFFS.open( WIFICTL_JSON_CONFIG_FILE, FILE_WRITE );
+
+    if (!file) {
+        log_e("Can't open file: %s!", WIFICTL_JSON_CONFIG_FILE );
+    }
+    else {
+        SpiRamJsonDocument doc( 10000 );
+
+        doc["autoon"] = wifictl_config.autoon;
+        doc["webserver"] = wifictl_config.webserver;
+        for ( int i = 0 ; i < NETWORKLIST_ENTRYS ; i++ ) {
+            doc["networklist"][ i ]["ssid"] = wifictl_networklist[ i ].ssid;
+            doc["networklist"][ i ]["psk"] = wifictl_networklist[ i ].password;
+        }
+
+        if ( serializeJsonPretty( doc, file ) == 0) {
+            log_e("Failed to write config file");
+        }
+        doc.clear();
+    }
     file.close();
-  }
 }
 
 /*
  *
  */
 void wifictl_load_config( void ) {
-  fs::File file = SPIFFS.open( WIFICTL_CONFIG_FILE, FILE_READ );
+    if ( SPIFFS.exists( WIFICTL_JSON_CONFIG_FILE ) ) {        
+        fs::File file = SPIFFS.open( WIFICTL_JSON_CONFIG_FILE, FILE_READ );
+        if (!file) {
+            log_e("Can't open file: %s!", WIFICTL_JSON_CONFIG_FILE );
+        }
+        else {
+            int filesize = file.size();
+            SpiRamJsonDocument doc( filesize * 2 );
 
-  if (!file) {
-    log_e("Can't open file: %s", WIFICTL_CONFIG_FILE );
-  }
-  else {
-    int filesize = file.size();
-    if ( filesize > sizeof( wifictl_config ) ) {
-      log_e("Failed to read configfile. Wrong filesize!" );
+            DeserializationError error = deserializeJson( doc, file );
+            if ( error ) {
+                log_e("update check deserializeJson() failed: %s", error.c_str() );
+            }
+            else {
+                wifictl_config.autoon = doc["autoon"].as<bool>();
+                wifictl_config.webserver = doc["webserver"].as<bool>();
+                for ( int i = 0 ; i < NETWORKLIST_ENTRYS ; i++ ) {
+                    strlcpy( wifictl_networklist[ i ].ssid    , doc["networklist"][ i ]["ssid"], sizeof( wifictl_networklist[ i ].ssid ) );
+                    strlcpy( wifictl_networklist[ i ].password, doc["networklist"][ i ]["psk"], sizeof( wifictl_networklist[ i ].password ) );
+                }
+            }        
+            doc.clear();
+        }
+        file.close();
     }
     else {
-      file.read( (uint8_t *)&wifictl_config, filesize );
+        log_i("no json config exists, read from binary");
+
+        wifictl_load_network();
+
+        fs::File file = SPIFFS.open( WIFICTL_CONFIG_FILE, FILE_READ );
+
+        if (!file) {
+            log_e("Can't open file: %s!", WIFICTL_CONFIG_FILE );
+        }
+        else {
+            int filesize = file.size();
+            if ( filesize > sizeof( wifictl_config ) ) {
+                log_e("Failed to read configfile. Wrong filesize!" );
+            }
+            else {
+                file.read( (uint8_t *)&wifictl_config, filesize );
+                file.close();
+                wifictl_save_config();
+                return;
+            }
+        file.close();
+        }
     }
-    file.close();
-  }
 }
 
 bool wifictl_get_autoon( void ) {
@@ -233,20 +288,6 @@ bool wifictl_get_webserver( void ) {
 void wifictl_set_webserver( bool webserver ) {
   wifictl_config.webserver = webserver;
   wifictl_save_config();
-}
-/*
- *
- */
-void wifictl_save_network( void ) {
-  fs::File file = SPIFFS.open( WIFICTL_LIST_FILE, FILE_WRITE );
-
-  if ( !file ) {
-    log_e("Can't save file: %s", WIFICTL_LIST_FILE );
-  }
-  else {
-    file.write( (uint8_t *)wifictl_networklist, sizeof( wifictl_networklist  ) );
-    file.close();
-  }
 }
 
 /*
@@ -296,7 +337,7 @@ bool wifictl_delete_network( const char *ssid ) {
     if( !strcmp( ssid, wifictl_networklist[ entry ].ssid ) ) {
       wifictl_networklist[ entry ].ssid[ 0 ] = '\0';
       wifictl_networklist[ entry ].password[ 0 ] = '\0';
-      wifictl_save_network();
+      wifictl_save_config();
       return( true );
     }
   }
@@ -314,7 +355,7 @@ bool wifictl_insert_network( const char *ssid, const char *password ) {
   for( int entry = 0 ; entry < NETWORKLIST_ENTRYS; entry++ ) {
     if( !strcmp( ssid, wifictl_networklist[ entry ].ssid ) ) {
       strncpy( wifictl_networklist[ entry ].password, password, sizeof( wifictl_networklist[ entry ].password ) );
-      wifictl_save_network();
+      wifictl_save_config();
       WiFi.scanNetworks();
       powermgm_set_event( POWERMGM_WIFI_SCAN );
       return( true );
@@ -325,7 +366,7 @@ bool wifictl_insert_network( const char *ssid, const char *password ) {
     if( strlen( wifictl_networklist[ entry ].ssid ) == 0 ) {
       strncpy( wifictl_networklist[ entry ].ssid, ssid, sizeof( wifictl_networklist[ entry ].ssid ) );
       strncpy( wifictl_networklist[ entry ].password, password, sizeof( wifictl_networklist[ entry ].password ) );
-      wifictl_save_network();
+      wifictl_save_config();
       WiFi.scanNetworks();
       powermgm_set_event( POWERMGM_WIFI_SCAN );
       return( true );
@@ -397,11 +438,6 @@ void wifictl_start_wps( void ) {
   WiFi.mode( WIFI_OFF );
   esp_wifi_stop();
 
-  statusbar_style_icon( STATUSBAR_WIFI, STATUSBAR_STYLE_GRAY );
-  statusbar_show_icon( STATUSBAR_WIFI );
-  statusbar_wifi_set_state( true, "wait for WPS" );
-  lv_obj_invalidate( lv_scr_act() );
-
   powermgm_set_event( POWERMGM_WIFI_WPS_REQUEST );
 
   ESP_ERROR_CHECK( esp_wifi_set_mode( WIFI_MODE_STA ) );
@@ -420,21 +456,20 @@ void wifictl_Task( void * pvParameters ) {
 
   while ( true ) {
     vTaskDelay( 500 );
-    if ( powermgm_get_event( POWERMGM_WIFI_ON_REQUEST ) ) {
-      statusbar_wifi_set_state( true, "activate" );
-      lv_obj_invalidate( lv_scr_act() );
-      WiFi.mode( WIFI_STA );
-      powermgm_clear_event( POWERMGM_WIFI_OFF_REQUEST | POWERMGM_WIFI_ACTIVE | POWERMGM_WIFI_CONNECTED | POWERMGM_WIFI_SCAN | POWERMGM_WIFI_ON_REQUEST );
-      log_i("request wifictl on done");
+    if ( powermgm_get_event( POWERMGM_WIFI_OFF_REQUEST ) && powermgm_get_event( POWERMGM_WIFI_ON_REQUEST ) ) {
+      log_e("confused by wifictl on/off at the same time. off request accept");
     }
-    else if ( powermgm_get_event( POWERMGM_WIFI_OFF_REQUEST ) ) {
-      statusbar_wifi_set_state( false, "" );
-      lv_obj_invalidate( lv_scr_act() );
+
+    if ( powermgm_get_event( POWERMGM_WIFI_OFF_REQUEST ) ) {
       WiFi.mode( WIFI_OFF );
       esp_wifi_stop();
-      powermgm_clear_event( POWERMGM_WIFI_OFF_REQUEST | POWERMGM_WIFI_ACTIVE | POWERMGM_WIFI_CONNECTED | POWERMGM_WIFI_SCAN | POWERMGM_WIFI_ON_REQUEST );
       log_i("request wifictl off done");
     }
+    else if ( powermgm_get_event( POWERMGM_WIFI_ON_REQUEST ) ) {
+      WiFi.mode( WIFI_STA );
+      log_i("request wifictl on done");
+    }
+    powermgm_clear_event( POWERMGM_WIFI_OFF_REQUEST | POWERMGM_WIFI_ACTIVE | POWERMGM_WIFI_CONNECTED | POWERMGM_WIFI_SCAN | POWERMGM_WIFI_ON_REQUEST );
     vTaskSuspend( _wifictl_Task );
   }
 }
