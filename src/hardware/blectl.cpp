@@ -48,6 +48,7 @@ void blectl_send_event_cb( EventBits_t event, char *msg );
 
 BLEServer *pServer = NULL;
 BLECharacteristic *pTxCharacteristic;
+BLECharacteristic *pRxCharacteristic;
 uint8_t txValue = 0;
 
 char *gadgetbridge_msg = NULL;
@@ -57,10 +58,11 @@ uint32_t gadgetbridge_msg_size = 0;
  *
  */
 class BleCtlServerCallbacks: public BLEServerCallbacks {
-    void onConnect(BLEServer* pServer) {
+    void onConnect(BLEServer* pServer, esp_ble_gatts_cb_param_t* param ) {
         blectl_set_event( BLECTL_CONNECT );
         blectl_clear_event( BLECTL_DISCONNECT );
         blectl_send_event_cb( BLECTL_CONNECT, (char*)"connected" );
+        pServer->updateConnParams( param->connect.remote_bda, 500, 1000, 750, 10000 );
         log_i("BLE connected");
     };
 
@@ -204,6 +206,7 @@ class BleCtlCallbacks : public BLECharacteristicCallbacks
     }
 };
 
+
 /*
  *
  */
@@ -249,7 +252,7 @@ void blectl_setup( void ) {
     pTxCharacteristic->setAccessPermissions(ESP_GATT_PERM_READ_ENCRYPTED | ESP_GATT_PERM_WRITE_ENCRYPTED);
     pTxCharacteristic->addDescriptor( new BLE2902() );
 
-    BLECharacteristic *pRxCharacteristic = pService->createCharacteristic( CHARACTERISTIC_UUID_RX, BLECharacteristic::PROPERTY_WRITE );
+    pRxCharacteristic = pService->createCharacteristic( CHARACTERISTIC_UUID_RX, BLECharacteristic::PROPERTY_WRITE );
     pRxCharacteristic->setAccessPermissions(ESP_GATT_PERM_READ_ENCRYPTED | ESP_GATT_PERM_WRITE_ENCRYPTED);
     pRxCharacteristic->setCallbacks( new BleCtlCallbacks() );
 
@@ -323,16 +326,25 @@ void blectl_register_cb( EventBits_t event, BLECTL_CALLBACK_FUNC blectl_event_cb
 
     blectl_event_cb_table[ blectl_event_cb_entrys - 1 ].event = event;
     blectl_event_cb_table[ blectl_event_cb_entrys - 1 ].event_cb = blectl_event_cb;
-    log_i("register event_cb success");
+    log_i("register blectl_event_cb success (%p)", blectl_event_cb_table[ blectl_event_cb_entrys - 1 ].event_cb );
 }
 /*
  *
  */
 void blectl_send_event_cb( EventBits_t event, char *msg ) {
-    for ( int entry = 0 ; entry < blectl_event_cb_entrys ; entry++ ){
+    for ( int entry = 0 ; entry < blectl_event_cb_entrys ; entry++ ) {
+        yield();
         if ( event & blectl_event_cb_table[ entry ].event ) {
-            log_i("call event_cb");
-            blectl_event_cb_table[ entry ].event_cb( event, msg );
+            char * tmp_msg = (char *)ps_malloc( strlen( msg ) + 1 );
+            if ( tmp_msg != NULL ) {
+                strcpy( tmp_msg, msg );
+                log_i("call blectl_event_cb (%p)", blectl_event_cb_table[ entry ].event_cb );
+                blectl_event_cb_table[ entry ].event_cb( event, tmp_msg );
+                free( tmp_msg );
+            }
+            else {
+                log_e("ps_alloc error");
+            }
         }
     }
 }

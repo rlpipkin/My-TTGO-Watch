@@ -24,7 +24,7 @@
 #include "gui/mainbar/mainbar.h"
 #include "app_tile.h"
 
-lv_app_entry_t app_entry[ MAX_APPS_ICON ];
+lv_app_icon_t app_entry[ MAX_APPS_ICON ];
 
 static lv_obj_t *app_cont = NULL;
 static lv_obj_t *app_label = NULL;
@@ -57,12 +57,14 @@ void app_tile_setup( void ) {
         app_entry[ app ].active = false;
         // create app icon container
         app_entry[ app ].app = lv_obj_create( app_cont, NULL );
+        mainbar_add_slide_element(app_entry[ app ].app);
         lv_obj_reset_style_list( app_entry[ app ].app, LV_OBJ_PART_MAIN );
         lv_obj_add_style( app_entry[ app ].app, LV_OBJ_PART_MAIN, style );
         lv_obj_set_size( app_entry[ app ].app, APP_ICON_X_SIZE, APP_ICON_Y_SIZE );
         lv_obj_align( app_entry[ app ].app , app_cont, LV_ALIGN_IN_TOP_LEFT, app_entry[ app ].x, app_entry[ app ].y );
         // create app label
         app_entry[ app ].label = lv_label_create( app_cont, NULL );
+        mainbar_add_slide_element(app_entry[ app ].label);
         lv_obj_reset_style_list( app_entry[ app ].label, LV_OBJ_PART_MAIN );
         lv_obj_add_style( app_entry[ app ].label, LV_OBJ_PART_MAIN, style );
         lv_obj_set_size( app_entry[ app ].label, APP_LABEL_X_SIZE, APP_LABEL_Y_SIZE );

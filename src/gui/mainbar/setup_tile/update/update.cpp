@@ -21,7 +21,6 @@
  */
 #include "config.h"
 #include <Arduino.h>
-#include <WiFi.h>
 #include <HTTPClient.h>
 #include <HTTPUpdate.h>
 
@@ -34,6 +33,7 @@
 #include "gui/statusbar.h"
 #include "hardware/display.h"
 #include "hardware/powermgm.h"
+#include "hardware/wifictl.h"
 
 EventGroupHandle_t update_event_handle = NULL;
 TaskHandle_t _update_Task;
@@ -57,6 +57,8 @@ LV_IMG_DECLARE(exit_32px);
 LV_IMG_DECLARE(setup_32px);
 LV_IMG_DECLARE(update_64px);
 LV_IMG_DECLARE(info_1_16px);
+
+void update_wifictl_event_cb( EventBits_t event, char* msg );
 
 void update_tile_setup( void ) {
     // get an app tile and copy mainstyle
@@ -135,15 +137,20 @@ void update_tile_setup( void ) {
     lv_label_set_text( update_status_label, "" );
     lv_obj_align( update_status_label, update_btn, LV_ALIGN_OUT_BOTTOM_MID, 0, 5 );
 
-    // regster callback
-    WiFi.onEvent( [](WiFiEvent_t event, WiFiEventInfo_t info) {
-        if ( update_setup_get_autosync() ) {
-            update_check_version();
-        }
-    }, WiFiEvent_t::SYSTEM_EVENT_STA_GOT_IP );
+    wifictl_register_cb( WIFICTL_CONNECT, update_wifictl_event_cb );
 
     update_event_handle = xEventGroupCreate();
     xEventGroupClearBits( update_event_handle, UPDATE_REQUEST );
+}
+
+void update_wifictl_event_cb( EventBits_t event, char* msg ) {
+    log_i("update wifictl event: %04x", event );
+    switch( event ) {
+        case WIFICTL_CONNECT:       if ( update_setup_get_autosync() ) {
+                                    update_check_version();
+                                    break;
+        }
+    }
 }
 
 static void enter_update_setup_setup_event_cb( lv_obj_t * obj, lv_event_t event ) {
@@ -202,7 +209,7 @@ void update_Task( void * pvParameters ) {
     log_i("start update task");
 
     if ( xEventGroupGetBits( update_event_handle) & UPDATE_GET_VERSION_REQUEST ) {
-        int64_t firmware_version = update_check_new_version();
+        int64_t firmware_version = update_check_new_version( update_setup_get_url() );
         if ( firmware_version > atol( __FIRMWARE__ ) && firmware_version > 0 ) {
             char version_msg[48] = "";
             snprintf( version_msg, sizeof( version_msg ), "new version: %lld", firmware_version );
@@ -215,9 +222,14 @@ void update_Task( void * pvParameters ) {
             lv_obj_align( update_status_label, update_btn, LV_ALIGN_OUT_BOTTOM_MID, 0, 15 );  
             lv_obj_set_hidden( update_info_img, true );
         }
+        else {
+            lv_label_set_text( update_status_label, "get update info failed" );
+            lv_obj_align( update_status_label, update_btn, LV_ALIGN_OUT_BOTTOM_MID, 0, 15 );  
+            lv_obj_set_hidden( update_info_img, true );
+        }
         lv_obj_invalidate( lv_scr_act() );
     }
-    if ( xEventGroupGetBits( update_event_handle) & UPDATE_REQUEST ) {
+    if ( ( xEventGroupGetBits( update_event_handle) & UPDATE_REQUEST ) && ( update_get_url() != NULL ) ) {
         if( WiFi.status() == WL_CONNECTED ) {
 
             uint32_t display_timeout = display_get_timeout();
@@ -230,7 +242,7 @@ void update_Task( void * pvParameters ) {
 
             httpUpdate.rebootOnUpdate( false );
 
-            t_httpUpdate_return ret = httpUpdate.update( client, "http://www.neo-guerillaz.de/ttgo-t-watch2020_v1.ino.bin" );
+            t_httpUpdate_return ret = httpUpdate.update( client, update_get_url() );
 
             switch(ret) {
                 case HTTP_UPDATE_FAILED:

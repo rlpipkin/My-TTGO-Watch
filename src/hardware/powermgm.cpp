@@ -26,6 +26,8 @@
 #include <esp_wifi.h>
 #include <time.h>
 #include "driver/adc.h"
+#include "esp_pm.h"
+
 
 #include "pmu.h"
 #include "bma.h"
@@ -97,10 +99,9 @@ void powermgm_loop( TTGOClass *ttgo ) {
         wifictl_wakeup();
         blectl_wakeup();
 
-        Serial.printf("Total heap: %d\r\n", ESP.getHeapSize());
-        Serial.printf("Free heap: %d\r\n", ESP.getFreeHeap());
-        Serial.printf("Total PSRAM: %d\r\n", ESP.getPsramSize());
-        Serial.printf("Free PSRAM: %d\r\n", ESP.getFreePsram());
+        log_i("Free heap: %d", ESP.getFreeHeap());
+        log_i("Free PSRAM heap: %d", ESP.getFreePsram());
+        log_i("uptime: %d", millis() / 1000 );
 
         ttgo->startLvglTick();
         lv_disp_trig_activity(NULL);
@@ -121,10 +122,10 @@ void powermgm_loop( TTGOClass *ttgo ) {
 
         ttgo->stopLvglTick();
 
-        Serial.printf("Total heap: %d\r\n", ESP.getHeapSize());
-        Serial.printf("Free heap: %d\r\n", ESP.getFreeHeap());
-        Serial.printf("Total PSRAM: %d\r\n", ESP.getPsramSize());
-        Serial.printf("Free PSRAM: %d\r\n", ESP.getFreePsram());
+        log_i("Free heap: %d", ESP.getFreeHeap());
+        log_i("Free PSRAM heap: %d", ESP.getFreePsram());
+        log_i("uptime: %d", millis() / 1000 );
+
         display_standby();
 
         timesyncToRTC();

@@ -22,14 +22,18 @@
 #ifndef _PMU_H
     #define _PMU_H
 
-    #define PMU_EVENT_AXP_INT       _BV(0)
+    #include "TTGO.h"
 
-    #define PMU_BATTERY_CAP         300
+    #define PMU_EVENT_AXP_INT       _BV(0)
 
     #define PMU_CONFIG_FILE         "/pmu.cfg"
     #define PMU_JSON_CONFIG_FILE    "/pmu.json"
 
     typedef struct {
+        int32_t designed_battery_cap = 300;
+        int32_t silence_wakeup_time = 60;
+        int32_t silence_wakeup_time_vbplug = 3;
+        bool high_charging_target_voltage = true;
         bool compute_percent = false;
         bool experimental_power_save = false;
         bool silence_wakeup = true;
@@ -88,6 +92,7 @@
      * @brief set experimental power save
      */
     void pmu_set_experimental_power_save( bool value );
+    int32_t pmu_get_designed_battery_cap( void );
     bool pmu_get_silence_wakeup( void );
     void pmu_set_silence_wakeup( bool value );
 

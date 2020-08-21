@@ -44,7 +44,7 @@
         lv_coord_t x;
         lv_coord_t y;
         bool active;
-    } lv_app_entry_t;
+    } lv_app_icon_t;
 
     /*
      * @brief setup the app tile
