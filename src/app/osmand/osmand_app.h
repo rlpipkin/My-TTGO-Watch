@@ -1,7 +1,7 @@
 /****************************************************************************
- *   Aug 21 17:26:00 2020
- *   Copyright  2020  Chris McNamee
- *   Email: chris.mcna@gmail.com
+ *   Aug 3 12:17:11 2020
+ *   Copyright  2020  Dirk Brosswick
+ *   Email: dirk.brosswick@googlemail.com
  ****************************************************************************/
  
 /*
@@ -19,17 +19,17 @@
  *  along with this program; if not, write to the Free Software
  *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
-#ifndef _stopwatch_APP_H
-    #define _stopwatch_APP_H
+#ifndef _OSMAND_APP_H
+    #define _OSMAND_APP_H
 
     #include <TTGO.h>
 
-//    #define stopwatch_WIDGET    // uncomment if an widget need
+//    #define EXAMPLE_WIDGET    // uncomment if an widget need
 
-    void stopwatch_app_setup( void );
-    void stopwatch_app_hide_app_icon_info( bool show );
-    void stopwatch_app_hide_widget_icon_info( bool show );
-    uint32_t stopwatch_app_get_app_setup_tile_num( void );
-    uint32_t stopwatch_app_get_app_main_tile_num( void );
+    void osmand_app_setup( void );
+    void osmand_app_hide_app_icon_info( bool show );
+    void osmand_app_hide_widget_icon_info( bool show );
+    uint32_t osmand_app_get_app_setup_tile_num( void );
+    uint32_t osmand_app_get_app_main_tile_num( void );
 
-#endif // _stopwatch_APP_H
+#endif // _OSMAND_APP_H
