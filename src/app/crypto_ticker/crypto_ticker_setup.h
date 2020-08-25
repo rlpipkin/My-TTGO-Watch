@@ -1,7 +1,7 @@
 /****************************************************************************
- *   Aug 3 12:17:11 2020
- *   Copyright  2020  Dirk Brosswick
- *   Email: dirk.brosswick@googlemail.com
+ *   Aug 22 16:36:11 2020
+ *   Copyright  2020  Chris McNamee
+ *   Email: chris.mcna@gmail.com
  ****************************************************************************/
  
 /*
@@ -19,17 +19,11 @@
  *  along with this program; if not, write to the Free Software
  *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
-#ifndef _OSMAND_APP_MAIN_H
-    #define _OSMAND_APP_MAIN_H
+#ifndef _CRYPTO_TICKER_SETUP_H
+    #define _CRYPTO_TICKER_SETUP_H
 
     #include <TTGO.h>
 
-    struct direction_t {
-        char direction[ 48 ];
-        char direction_helper[ 48 ];
-        const lv_img_dsc_t *img;
-    };
+    void crypto_ticker_setup_setup( uint32_t tile_num );
 
-    void osmand_app_main_setup( uint32_t tile_num );
-
-#endif // _OSMAND_APP_MAIN_H
+#endif // _CRYPTO_TICKER_SETUP_H

@@ -1,7 +1,7 @@
 /****************************************************************************
- *   Aug 3 12:17:11 2020
- *   Copyright  2020  Dirk Brosswick
- *   Email: dirk.brosswick@googlemail.com
+ *   Aug 22 16:36:11 2020
+ *   Copyright  2020  Chris McNamee
+ *   Email: chris.mcna@gmail.com
  ****************************************************************************/
  
 /*
@@ -19,17 +19,16 @@
  *  along with this program; if not, write to the Free Software
  *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
-#ifndef _OSMAND_APP_MAIN_H
-    #define _OSMAND_APP_MAIN_H
 
-    #include <TTGO.h>
+#include "crypto_ticker_widget.h" //TODO: why is this needed
+#include "crypto_ticker_main.h"   //TODO: why is this needed
 
-    struct direction_t {
-        char direction[ 48 ];
-        char direction_helper[ 48 ];
-        const lv_img_dsc_t *img;
-    };
+#ifndef _CRYPTO_TICKER_FETCH_H
+    #define _CRYPTO_TICKER_FETCH_H
 
-    void osmand_app_main_setup( uint32_t tile_num );
+    #define MY_TTGO_WATCH_HOST    "my-ttgo-watch.co.uk"
 
-#endif // _OSMAND_APP_MAIN_H
+    int crypto_ticker_fetch_price( crypto_ticker_config_t * crypto_ticker_config, crypto_ticker_widget_data_t * crypto_ticker_today );
+    int crypto_ticker_fetch_statistics( crypto_ticker_config_t *crypto_ticker_config, crypto_ticker_main_data_t *crypto_ticker_main_data );
+
+#endif // _CRYPTO_TICKER_FETCH_H
