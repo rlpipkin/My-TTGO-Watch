@@ -34,12 +34,15 @@
 #include "hardware/motor.h"
 #include "hardware/wifictl.h"
 #include "hardware/blectl.h"
+#include "hardware/pmu.h"
+#include "hardware/timesync.h"
 
 #include "app/weather/weather.h"
 #include "app/stopwatch/stopwatch_app.h"
 #include "app/crypto_ticker/crypto_ticker.h"
 #include "app/example_app/example_app.h"
 #include "app/osmand/osmand_app.h"
+#include "app/IRController/IRController.h"
 
 TTGOClass *ttgo = TTGOClass::getWatch();
 
@@ -47,36 +50,40 @@ void setup()
 {
     Serial.begin(115200);
     Serial.printf("starting t-watch V1, version: " __FIRMWARE__ "\r\n");
+    
     ttgo->begin();
     ttgo->lvgl_begin();
-    
+ 
     SPIFFS.begin();
-
     motor_setup();
 
     // force to store all new heap allocations in psram to get more internal ram
     heap_caps_malloc_extmem_enable( 1 );
-
-    display_setup( ttgo );
-
+    display_setup();
     screenshot_setup();
-
-    splash_screen_stage_one( ttgo );
+    splash_screen_stage_one();
     splash_screen_stage_update( "init serial", 10 );
 
     splash_screen_stage_update( "init spiff", 20 );
     if ( !SPIFFS.begin() ) {        
         splash_screen_stage_update( "format spiff", 30 );
         SPIFFS.format();
+        splash_screen_stage_update( "format spiff done", 40 );
+        delay(500);
+        bool remount_attempt = SPIFFS.begin();
+        if (!remount_attempt){
+            splash_screen_stage_update( "Err: SPIFF Failed", 0 );
+            delay(3000);
+            ESP.restart();
+        }
     }
 
     splash_screen_stage_update( "init rtc", 50 );
-    ttgo->rtc->syncToSystem();
-
+    timesyncToSystem();
     splash_screen_stage_update( "init powermgm", 60 );
-    powermgm_setup( ttgo );
-
+    powermgm_setup();
     splash_screen_stage_update( "init gui", 80 );
+    splash_screen_stage_finish();
     gui_setup(); 
     /*
      * add apps and widgets here!!!
@@ -86,19 +93,20 @@ void setup()
     crypto_ticker_setup();
     example_app_setup();
     osmand_app_setup();
+    IRController_setup();
     /*
      *
      */
-
-    if (wifictl_get_autoon() && (ttgo->power->isChargeing() || ttgo->power->isVBUSPlug() || (ttgo->power->getBattVoltage() > 3400)))
+    if ( wifictl_get_autoon() && ( pmu_is_charging() || pmu_is_vbus_plug() || ( pmu_get_battery_voltage() > 3400) ) )
         wifictl_on();
-
-    splash_screen_stage_finish( ttgo );
-    display_set_brightness( display_get_brightness() );
 
     // enable to store data in normal heap
     heap_caps_malloc_extmem_enable( 16*1024 );
     blectl_setup();
+
+    display_set_brightness( display_get_brightness() );
+
+    delay(500);
 
     Serial.printf("Total heap: %d\r\n", ESP.getHeapSize());
     Serial.printf("Free heap: %d\r\n", ESP.getFreeHeap());
@@ -111,6 +119,6 @@ void setup()
 void loop()
 {
     delay(5);
-    gui_loop( ttgo );
-    powermgm_loop( ttgo );
+    gui_loop();
+    powermgm_loop();
 }

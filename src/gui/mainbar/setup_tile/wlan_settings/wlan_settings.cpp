@@ -23,9 +23,10 @@
 #include "wlan_settings.h"
 
 #include "gui/mainbar/mainbar.h"
-#include "gui/mainbar/setup_tile/setup.h"
+#include "gui/mainbar/setup_tile/setup_tile.h"
 #include "gui/statusbar.h"
 #include "gui/keyboard.h"
+#include "gui/setup.h"
 
 #include "hardware/wifictl.h"
 #include "hardware/motor.h"
@@ -87,16 +88,8 @@ void wlan_settings_tile_setup( void ) {
     lv_style_set_border_width( &wifi_settings_style, LV_OBJ_PART_MAIN, 0);
     lv_obj_add_style( wifi_settings_tile, LV_OBJ_PART_MAIN, &wifi_settings_style );
 
-    // register an setup icon an set an callback
-    lv_obj_t *wifi_setup = lv_imgbtn_create ( setup_tile_register_setup(), NULL);
-    mainbar_add_slide_element(wifi_setup);
-    lv_imgbtn_set_src( wifi_setup, LV_BTN_STATE_RELEASED, &wifi_64px);
-    lv_imgbtn_set_src( wifi_setup, LV_BTN_STATE_PRESSED, &wifi_64px);
-    lv_imgbtn_set_src( wifi_setup, LV_BTN_STATE_CHECKED_RELEASED, &wifi_64px);
-    lv_imgbtn_set_src( wifi_setup, LV_BTN_STATE_CHECKED_PRESSED, &wifi_64px);
-    lv_obj_add_style( wifi_setup, LV_IMGBTN_PART_MAIN,  mainbar_get_style() );
-    lv_obj_align( wifi_setup, NULL, LV_ALIGN_CENTER, 0, 0 );
-    lv_obj_set_event_cb( wifi_setup, enter_wifi_settings_event_cb );
+    icon_t *wifi_setup_icon = setup_register( "wifi", &wifi_64px, enter_wifi_settings_event_cb );
+    setup_hide_indicator( wifi_setup_icon );
 
     lv_obj_t *exit_btn = lv_imgbtn_create( wifi_settings_tile, NULL);
     lv_imgbtn_set_src( exit_btn, LV_BTN_STATE_RELEASED, &exit_32px);
@@ -130,7 +123,7 @@ void wlan_settings_tile_setup( void ) {
     lv_obj_set_event_cb( wifi_onoff, wifi_onoff_event_handler);
 
     wifiname_list = lv_list_create( wifi_settings_tile, NULL);
-    lv_obj_set_size( wifiname_list, LV_HOR_RES_MAX, 160);
+    lv_obj_set_size( wifiname_list, lv_disp_get_hor_res( NULL ), 160);
     lv_style_init( &wifi_list_style  );
     lv_style_set_border_width( &wifi_list_style , LV_OBJ_PART_MAIN, 0);
     lv_style_set_radius( &wifi_list_style , LV_OBJ_PART_MAIN, 0);
@@ -235,13 +228,13 @@ void wlan_password_tile_setup( uint32_t wifi_password_tile_num ) {
     lv_textarea_set_pwd_mode( wifi_password_pass_textfield, false);
     lv_textarea_set_one_line( wifi_password_pass_textfield, true);
     lv_textarea_set_cursor_hidden( wifi_password_pass_textfield, true);
-    lv_obj_set_width( wifi_password_pass_textfield, LV_HOR_RES );
+    lv_obj_set_width( wifi_password_pass_textfield, lv_disp_get_hor_res( NULL ) );
     lv_obj_align( wifi_password_pass_textfield, wifi_password_tile, LV_ALIGN_IN_TOP_LEFT, 0, 75);
     lv_obj_set_event_cb( wifi_password_pass_textfield, wlan_password_event_cb );
 
     lv_obj_t *mac_label = lv_label_create( wifi_password_tile, NULL);
     lv_obj_add_style( mac_label, LV_IMGBTN_PART_MAIN, &wifi_password_style );
-    lv_obj_set_width( mac_label, LV_HOR_RES);
+    lv_obj_set_width( mac_label, lv_disp_get_hor_res( NULL ) );
     lv_obj_align( mac_label, wifi_password_tile, LV_ALIGN_IN_BOTTOM_LEFT, 0, 0);
     lv_label_set_text_fmt( mac_label, "MAC: %s", WiFi.macAddress().c_str());
 
@@ -328,7 +321,7 @@ void wlan_setup_tile_setup( uint32_t wifi_setup_tile_num ) {
     lv_obj_align( exit_label, exit_btn, LV_ALIGN_OUT_RIGHT_MID, 5, 0 );
 
     lv_obj_t *wifi_autoon_onoff_cont = lv_obj_create( wifi_setup_tile, NULL );
-    lv_obj_set_size(wifi_autoon_onoff_cont, LV_HOR_RES_MAX , 40);
+    lv_obj_set_size(wifi_autoon_onoff_cont, lv_disp_get_hor_res( NULL ) , 40);
     lv_obj_add_style( wifi_autoon_onoff_cont, LV_OBJ_PART_MAIN, &wifi_setup_style  );
     lv_obj_align( wifi_autoon_onoff_cont, wifi_setup_tile, LV_ALIGN_IN_TOP_RIGHT, 0, 75 );
 
@@ -344,7 +337,7 @@ void wlan_setup_tile_setup( uint32_t wifi_setup_tile_num ) {
     lv_obj_align( wifi_autoon_label, wifi_autoon_onoff_cont, LV_ALIGN_IN_LEFT_MID, 5, 0 );
 
     lv_obj_t *wifi_webserver_onoff_cont = lv_obj_create( wifi_setup_tile, NULL );
-    lv_obj_set_size(wifi_webserver_onoff_cont, LV_HOR_RES_MAX , 40);
+    lv_obj_set_size(wifi_webserver_onoff_cont, lv_disp_get_hor_res( NULL ) , 40);
     lv_obj_add_style( wifi_webserver_onoff_cont, LV_OBJ_PART_MAIN, &wifi_setup_style  );
     lv_obj_align( wifi_webserver_onoff_cont, wifi_autoon_onoff_cont, LV_ALIGN_OUT_BOTTOM_MID, 0, 0 );
 

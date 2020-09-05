@@ -32,7 +32,7 @@
 #include "mainbar/main_tile/main_tile.h"
 #include "mainbar/app_tile/app_tile.h"
 #include "mainbar/note_tile/note_tile.h"
-#include "mainbar/setup_tile/setup.h"
+#include "mainbar/setup_tile/setup_tile.h"
 
 #include "mainbar/setup_tile/battery_settings/battery_settings.h"
 #include "mainbar/setup_tile/display_settings/display_settings.h"
@@ -47,20 +47,14 @@
 
 LV_IMG_DECLARE(bg2)
 
-/**
- * Create a demo application
- */
-void gui_setup(void)
+void gui_setup( void )
 {
-    lv_coord_t hres = lv_disp_get_hor_res(NULL);
-    lv_coord_t vres = lv_disp_get_ver_res(NULL);
-
     //Create wallpaper
-    lv_obj_t *img_bin = lv_img_create( lv_scr_act() , NULL);  /*Create an image object*/
-    lv_img_set_src(img_bin, &bg2 );
-    lv_obj_set_width( img_bin, hres );
-    lv_obj_set_height( img_bin, vres );
-    lv_obj_align(img_bin, NULL, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_t *img_bin = lv_img_create( lv_scr_act() , NULL );
+    lv_img_set_src( img_bin, &bg2 );
+    lv_obj_set_width( img_bin, lv_disp_get_hor_res( NULL ) );
+    lv_obj_set_height( img_bin, lv_disp_get_ver_res( NULL ) );
+    lv_obj_align( img_bin, NULL, LV_ALIGN_CENTER, 0, 0 );
 
     mainbar_setup();
     /* add the four mainbar screens */
@@ -79,17 +73,14 @@ void gui_setup(void)
     update_tile_setup();
 
     statusbar_setup();
-    lv_disp_trig_activity(NULL);
+    lv_disp_trig_activity( NULL );
 
     keyboard_setup();
 
     return;
 }
 
-/*
- *
- */
-void gui_loop( TTGOClass *ttgo ) {
+void gui_loop( void ) {
     // if we run in silence mode    
     if ( powermgm_get_event( POWERMGM_SILENCE_WAKEUP ) ) {
         if ( lv_disp_get_inactive_time(NULL) < display_get_timeout() * 1000 ) {

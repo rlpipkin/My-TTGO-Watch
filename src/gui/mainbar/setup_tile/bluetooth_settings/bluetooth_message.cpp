@@ -23,7 +23,7 @@
 #include "bluetooth_message.h"
 
 #include "gui/mainbar/mainbar.h"
-#include "gui/mainbar/setup_tile/setup.h"
+#include "gui/mainbar/setup_tile/setup_tile.h"
 #include "gui/statusbar.h"
 #include "hardware/blectl.h"
 #include "hardware/powermgm.h"
@@ -50,18 +50,20 @@ LV_IMG_DECLARE(message_32px);
 LV_IMG_DECLARE(osmand_32px);
 LV_IMG_DECLARE(youtube_32px);
 LV_IMG_DECLARE(instagram_32px);
+LV_IMG_DECLARE(tinder_32px);
 LV_FONT_DECLARE(Ubuntu_16px);
 LV_FONT_DECLARE(Ubuntu_32px);
 
 src_icon_t src_icon[] = {
-    { "Telegram", 100, &telegram_32px },
-    { "Whatsapp", 100, &whatsapp_32px },
-    { "K-9 Mail", 100, &k9mail_32px },
-    { "Gmail", 100, &email_32px },
-    { "E-Mail", 100, &message_32px },
-    { "OsmAnd", 100, &osmand_32px },
-    { "YouTube", 100, &youtube_32px },
-    { "Instagram", 100, &instagram_32px },
+    { "Telegram", 50, &telegram_32px },
+    { "Whatsapp", 50, &whatsapp_32px },
+    { "K-9 Mail", 50, &k9mail_32px },
+    { "Gmail", 50, &email_32px },
+    { "E-Mail", 50, &message_32px },
+    { "OsmAnd", 0, &osmand_32px },
+    { "YouTube", 50, &youtube_32px },
+    { "Instagram", 50, &instagram_32px },
+    { "Tinder", 50, &tinder_32px },
     { "", 0, NULL }
 };
 
@@ -102,7 +104,7 @@ void bluetooth_message_tile_setup( void ) {
     lv_obj_align( bluetooth_message_sender_label, bluetooth_message_img, LV_ALIGN_OUT_BOTTOM_LEFT, 5, 5 );
 
     bluetooth_message_page = lv_page_create( bluetooth_message_tile, NULL);
-    lv_obj_set_size( bluetooth_message_page, LV_HOR_RES_MAX - 20, 160 );
+    lv_obj_set_size( bluetooth_message_page, lv_disp_get_hor_res( NULL ) - 20, 160 );
     lv_obj_add_style( bluetooth_message_page, LV_OBJ_PART_MAIN, &bluetooth_message_style );
     lv_page_set_scrlbar_mode( bluetooth_message_page, LV_SCRLBAR_MODE_DRAG );
     lv_obj_align( bluetooth_message_page, bluetooth_message_sender_label, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 5 );
@@ -151,7 +153,9 @@ const lv_img_dsc_t *bluetooth_message_find_img( const char * src_name ) {
     for ( int i = 0; src_icon[ i ].img != NULL; i++ ) {
         if ( strstr( src_name, src_icon[ i ].src_name ) ) {
             log_i("hit: %s -> %s", src_name, src_icon[ i ].src_name );
-            motor_vibe( src_icon[ i ].vibe );
+            if ( src_icon[ i ].vibe != 0 ) {
+                motor_vibe( src_icon[ i ].vibe );
+            }
             return( src_icon[ i ].img );
         }
     }

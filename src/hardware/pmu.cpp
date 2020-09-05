@@ -9,22 +9,18 @@
 #include "motor.h"
 #include "blectl.h"
 
-
 #include "gui/statusbar.h"
 
 EventGroupHandle_t pmu_event_handle = NULL;
-
 void IRAM_ATTR pmu_irq( void );
-
 pmu_config_t pmu_config;
 
-/*
- * init the pmu: AXP202 
- */
-void pmu_setup( TTGOClass *ttgo ) {
+void pmu_setup( void ) {
     pmu_event_handle = xEventGroupCreate();
 
     pmu_read_config();
+
+    TTGOClass *ttgo = TTGOClass::getWatch();
 
     // Turn on the IRQ used
     ttgo->power->adc1Enable( AXP202_BATT_VOL_ADC1 | AXP202_BATT_CUR_ADC1 | AXP202_VBUS_VOL_ADC1 | AXP202_VBUS_CUR_ADC1, AXP202_ON);
@@ -62,9 +58,6 @@ void pmu_setup( TTGOClass *ttgo ) {
     attachInterrupt( AXP202_INT, &pmu_irq, FALLING );
 }
 
-/*
- * IRQ routine AXP202
- */
 void IRAM_ATTR  pmu_irq( void ) {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     /*
@@ -121,9 +114,7 @@ void pmu_wakeup( void ) {
     ttgo->power->setPowerOutPut( AXP202_LDO3, AXP202_ON );
     ttgo->power->setPowerOutPut( AXP202_LDO2, AXP202_ON );
 }
-/*
- *
- */
+
 void pmu_save_config( void ) {
     if ( SPIFFS.exists( PMU_CONFIG_FILE ) ) {
         SPIFFS.remove( PMU_CONFIG_FILE );
@@ -158,9 +149,6 @@ void pmu_save_config( void ) {
     file.close();
 }
 
-/*
- *
- */
 void pmu_read_config( void ) {
     if ( SPIFFS.exists( PMU_JSON_CONFIG_FILE ) ) {        
         fs::File file = SPIFFS.open( PMU_JSON_CONFIG_FILE, FILE_READ );
@@ -177,8 +165,8 @@ void pmu_read_config( void ) {
             }
             else {
                 pmu_config.silence_wakeup = doc["silence_wakeup"] | false;
-                pmu_config.silence_wakeup_time = doc["compute_percent"] | 60;
-                pmu_config.silence_wakeup_time_vbplug = doc["compute_percent"] | 3;
+                pmu_config.silence_wakeup_time = doc["silence_wakeup_time"] | 60;
+                pmu_config.silence_wakeup_time_vbplug = doc["silence_wakeup_time_vbplug"] | 3;
                 pmu_config.experimental_power_save = doc["experimental_power_save"] | false;
                 pmu_config.compute_percent = doc["compute_percent"] | false;
                 pmu_config.high_charging_target_voltage = doc["high_charging_target_voltage"] | false;
@@ -246,12 +234,11 @@ void pmu_set_experimental_power_save( bool value ) {
     pmu_save_config();
 }
 
-/*
- * loop routine for handling IRQ in main loop
- */
-void pmu_loop( TTGOClass *ttgo ) {
+void pmu_loop( void ) {
     static uint64_t nextmillis = 0;
     bool updatetrigger = false;
+
+    TTGOClass *ttgo = TTGOClass::getWatch();
 
     /*
      * handle IRQ event
@@ -294,13 +281,15 @@ void pmu_loop( TTGOClass *ttgo ) {
     if ( !powermgm_get_event( POWERMGM_STANDBY ) ) {
         if ( nextmillis < millis() || updatetrigger == true ) {
             nextmillis = millis() + 1000;
-            statusbar_update_battery( pmu_get_battery_percent( ttgo ), ttgo->power->isChargeing(), ttgo->power->isVBUSPlug() );
-            blectl_update_battery( pmu_get_battery_percent( ttgo ), ttgo->power->isChargeing(), ttgo->power->isVBUSPlug() );
+            statusbar_update_battery( pmu_get_battery_percent(), ttgo->power->isChargeing(), ttgo->power->isVBUSPlug() );
+            blectl_update_battery( pmu_get_battery_percent(), ttgo->power->isChargeing(), ttgo->power->isVBUSPlug() );
         }
     }
 }
 
-int32_t pmu_get_battery_percent( TTGOClass *ttgo ) {
+int32_t pmu_get_battery_percent( void ) {
+    TTGOClass *ttgo = TTGOClass::getWatch();
+
     if ( ttgo->power->getBattChargeCoulomb() < ttgo->power->getBattDischargeCoulomb() || ttgo->power->getBattVoltage() < 3200 ) {
         ttgo->power->ClearCoulombcounter();
     }
@@ -311,4 +300,39 @@ int32_t pmu_get_battery_percent( TTGOClass *ttgo ) {
     else {
         return( ttgo->power->getBattPercentage() );
     }
+}
+
+float pmu_get_battery_voltage( void ) {
+    TTGOClass *ttgo = TTGOClass::getWatch();
+    return( ttgo->power->getBattVoltage() );
+}
+
+float pmu_get_battery_charge_current( void ) {
+    TTGOClass *ttgo = TTGOClass::getWatch();
+    return( ttgo->power->getBattChargeCurrent() );
+}
+
+float pmu_get_battery_discharge_current( void ) {
+    TTGOClass *ttgo = TTGOClass::getWatch();
+    return( ttgo->power->getBattDischargeCurrent() );
+}
+
+float pmu_get_vbus_voltage( void ) {
+    TTGOClass *ttgo = TTGOClass::getWatch();
+    return( ttgo->power->getVbusVoltage() );
+}
+
+float pmu_get_coulumb_data( void ) {
+    TTGOClass *ttgo = TTGOClass::getWatch();
+    return( ttgo->power->getCoulombData() );
+}
+
+bool pmu_is_charging( void ) {
+    TTGOClass *ttgo = TTGOClass::getWatch();
+    return( ttgo->power->isChargeing() );
+}
+
+bool pmu_is_vbus_plug( void ) {
+    TTGOClass *ttgo = TTGOClass::getWatch();
+    return( ttgo->power->isVBUSPlug() );
 }

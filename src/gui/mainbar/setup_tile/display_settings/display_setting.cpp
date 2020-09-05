@@ -23,19 +23,22 @@
 #include "display_settings.h"
 
 #include "gui/mainbar/mainbar.h"
-#include "gui/mainbar/setup_tile/setup.h"
+#include "gui/mainbar/setup_tile/setup_tile.h"
 #include "gui/statusbar.h"
+#include "gui/setup.h"
+
 #include "hardware/display.h"
 #include "hardware/motor.h"
+#include "hardware/bma.h"
+
+
+icon_t *display_setup_icon = NULL;
 
 lv_obj_t *display_settings_tile_1 = NULL;
 lv_obj_t *display_settings_tile_2 = NULL;
 lv_style_t display_settings_style;
 uint32_t display_tile_num_1;
 uint32_t display_tile_num_2;
-
-lv_obj_t *display_setup_icon_cont = NULL;
-lv_obj_t *display_setup_info_img = NULL;
 
 lv_obj_t *display_brightness_slider = NULL;
 lv_obj_t *display_timeout_slider = NULL;
@@ -76,22 +79,8 @@ void display_settings_tile_setup( void ) {
     lv_obj_add_style( display_settings_tile_1, LV_OBJ_PART_MAIN, &display_settings_style );
     lv_obj_add_style( display_settings_tile_2, LV_OBJ_PART_MAIN, &display_settings_style );
 
-    // register an setup icon an set an callback
-    display_setup_icon_cont = setup_tile_register_setup();
-    lv_obj_t *display_setup_icon = lv_imgbtn_create ( display_setup_icon_cont, NULL);
-    mainbar_add_slide_element(display_setup_icon);
-    lv_imgbtn_set_src( display_setup_icon, LV_BTN_STATE_RELEASED, &brightness_64px);
-    lv_imgbtn_set_src( display_setup_icon, LV_BTN_STATE_PRESSED, &brightness_64px);
-    lv_imgbtn_set_src( display_setup_icon, LV_BTN_STATE_CHECKED_RELEASED, &brightness_64px);
-    lv_imgbtn_set_src( display_setup_icon, LV_BTN_STATE_CHECKED_PRESSED, &brightness_64px);
-    lv_obj_add_style( display_setup_icon, LV_IMGBTN_PART_MAIN,  mainbar_get_style() );
-    lv_obj_align( display_setup_icon, NULL, LV_ALIGN_CENTER, 0, 0 );
-    lv_obj_set_event_cb( display_setup_icon, enter_display_setup_event_cb );
-
-    display_setup_info_img = lv_img_create( display_setup_icon_cont, NULL );
-    lv_img_set_src( display_setup_info_img, &info_update_16px );
-    lv_obj_align( display_setup_info_img, display_setup_icon_cont, LV_ALIGN_IN_TOP_RIGHT, 0, 0 );
-    lv_obj_set_hidden( display_setup_info_img, true );
+    display_setup_icon = setup_register( "display", &brightness_64px, enter_display_setup_event_cb );
+    setup_hide_indicator( display_setup_icon );
 
     lv_obj_t *exit_btn_1 = lv_imgbtn_create( display_settings_tile_1, NULL);
     lv_imgbtn_set_src( exit_btn_1, LV_BTN_STATE_RELEASED, &exit_32px);
@@ -126,7 +115,7 @@ void display_settings_tile_setup( void ) {
     lv_obj_set_event_cb( up_btn_1, up_display_setup_event_cb );
     
     lv_obj_t *brightness_cont = lv_obj_create( display_settings_tile_1, NULL );
-    lv_obj_set_size( brightness_cont, LV_HOR_RES_MAX , 48 );
+    lv_obj_set_size( brightness_cont, lv_disp_get_hor_res( NULL ) , 48 );
     lv_obj_add_style( brightness_cont, LV_OBJ_PART_MAIN, &display_settings_style  );
     lv_obj_align( brightness_cont, display_settings_tile_1, LV_ALIGN_IN_TOP_RIGHT, 0, 75 );
     display_brightness_slider = lv_slider_create( brightness_cont, NULL );
@@ -134,7 +123,7 @@ void display_settings_tile_setup( void ) {
     lv_obj_add_style( display_brightness_slider, LV_SLIDER_PART_INDIC, mainbar_get_slider_style() );
     lv_obj_add_style( display_brightness_slider, LV_SLIDER_PART_KNOB, mainbar_get_slider_style() );
     lv_slider_set_range( display_brightness_slider, DISPLAY_MIN_BRIGHTNESS, DISPLAY_MAX_BRIGHTNESS );
-    lv_obj_set_size( display_brightness_slider, LV_HOR_RES_MAX - 100 , 10 );
+    lv_obj_set_size( display_brightness_slider, lv_disp_get_hor_res( NULL ) - 100 , 10 );
     lv_obj_align( display_brightness_slider, brightness_cont, LV_ALIGN_IN_RIGHT_MID, -30, 0 );
     lv_obj_set_event_cb( display_brightness_slider, display_brightness_setup_event_cb );
     lv_obj_t *brightness_icon = lv_img_create( brightness_cont, NULL );
@@ -142,7 +131,7 @@ void display_settings_tile_setup( void ) {
     lv_obj_align( brightness_icon, brightness_cont, LV_ALIGN_IN_LEFT_MID, 15, 0 );
 
     lv_obj_t *timeout_cont = lv_obj_create( display_settings_tile_1, NULL );
-    lv_obj_set_size( timeout_cont, LV_HOR_RES_MAX , 58 );
+    lv_obj_set_size( timeout_cont, lv_disp_get_hor_res( NULL ) , 58 );
     lv_obj_add_style( timeout_cont, LV_OBJ_PART_MAIN, &display_settings_style  );
     lv_obj_align( timeout_cont, brightness_cont, LV_ALIGN_OUT_BOTTOM_MID, 0, 0 );
     display_timeout_slider = lv_slider_create( timeout_cont, NULL );
@@ -150,7 +139,7 @@ void display_settings_tile_setup( void ) {
     lv_obj_add_style( display_timeout_slider, LV_SLIDER_PART_INDIC, mainbar_get_slider_style() );
     lv_obj_add_style( display_timeout_slider, LV_SLIDER_PART_KNOB, mainbar_get_slider_style() );
     lv_slider_set_range( display_timeout_slider, DISPLAY_MIN_TIMEOUT, DISPLAY_MAX_TIMEOUT );
-    lv_obj_set_size(display_timeout_slider, LV_HOR_RES_MAX - 100 , 10 );
+    lv_obj_set_size(display_timeout_slider, lv_disp_get_hor_res( NULL ) - 100 , 10 );
     lv_obj_align( display_timeout_slider, timeout_cont, LV_ALIGN_IN_TOP_RIGHT, -30, 10 );
     lv_obj_set_event_cb( display_timeout_slider, display_timeout_setup_event_cb );
     display_timeout_slider_label = lv_label_create( timeout_cont, NULL );
@@ -162,7 +151,7 @@ void display_settings_tile_setup( void ) {
     lv_obj_align( timeout_icon, timeout_cont, LV_ALIGN_IN_LEFT_MID, 15, 0 );
 
     lv_obj_t *rotation_cont = lv_obj_create( display_settings_tile_1, NULL );
-    lv_obj_set_size(rotation_cont, LV_HOR_RES_MAX , 40 );
+    lv_obj_set_size(rotation_cont, lv_disp_get_hor_res( NULL ) , 40 );
     lv_obj_add_style( rotation_cont, LV_OBJ_PART_MAIN, &display_settings_style  );
     lv_obj_align( rotation_cont, timeout_cont, LV_ALIGN_OUT_BOTTOM_MID, 0, 0 );
     lv_obj_t *display_rotation_label = lv_label_create( rotation_cont, NULL );
@@ -176,7 +165,7 @@ void display_settings_tile_setup( void ) {
     lv_obj_set_event_cb(display_rotation_list, display_rotation_event_handler);
 
     lv_obj_t *vibe_cont = lv_obj_create( display_settings_tile_2, NULL );
-    lv_obj_set_size(vibe_cont, LV_HOR_RES_MAX , 40);
+    lv_obj_set_size(vibe_cont, lv_disp_get_hor_res( NULL ) , 40);
     lv_obj_add_style( vibe_cont, LV_OBJ_PART_MAIN, &display_settings_style );
     lv_obj_align( vibe_cont, display_settings_tile_2, LV_ALIGN_IN_TOP_RIGHT, 0, 75 );
     display_vibe_onoff = lv_switch_create( vibe_cont, NULL );
@@ -191,7 +180,7 @@ void display_settings_tile_setup( void ) {
     lv_obj_align( display_vibe_label, vibe_cont, LV_ALIGN_IN_LEFT_MID, 5, 0 );
 
     lv_obj_t *block_return_maintile_cont = lv_obj_create( display_settings_tile_2, NULL );
-    lv_obj_set_size(block_return_maintile_cont, LV_HOR_RES_MAX , 40 );
+    lv_obj_set_size(block_return_maintile_cont, lv_disp_get_hor_res( NULL ) , 40 );
     lv_obj_add_style( block_return_maintile_cont, LV_OBJ_PART_MAIN, &display_settings_style  );
     lv_obj_align( block_return_maintile_cont, vibe_cont, LV_ALIGN_OUT_BOTTOM_MID, 0, 0 );
     display_block_return_maintile_onoff = lv_switch_create( block_return_maintile_cont, NULL );
@@ -210,7 +199,7 @@ void display_settings_tile_setup( void ) {
     char temp[16]="";
     if ( lv_slider_get_value( display_timeout_slider ) == DISPLAY_MAX_TIMEOUT ) {
         snprintf( temp, sizeof( temp ), "no timeout" );
-        lv_obj_set_hidden( display_setup_info_img, false );
+        setup_set_indicator( display_setup_icon, ICON_INDICATOR_FAIL );
     }
     else {
         snprintf( temp, sizeof( temp ), "%d seconds", lv_slider_get_value( display_timeout_slider ) );
@@ -295,11 +284,11 @@ static void display_timeout_setup_event_cb( lv_obj_t * obj, lv_event_t event ) {
                                             char temp[16]="";
                                             if ( lv_slider_get_value(obj) == DISPLAY_MAX_TIMEOUT ) {
                                                 snprintf( temp, sizeof( temp ), "no timeout" );
-                                                lv_obj_set_hidden( display_setup_info_img, false );
+                                                setup_set_indicator( display_setup_icon, ICON_INDICATOR_FAIL );
                                             }
                                             else {
                                                 snprintf( temp, sizeof( temp ), "%d seconds", lv_slider_get_value(obj) );
-                                                        lv_obj_set_hidden( display_setup_info_img, true );
+                                                setup_hide_indicator( display_setup_icon );
                                             }
                                             lv_label_set_text( display_timeout_slider_label, temp );
                                             lv_obj_align( display_timeout_slider_label, display_timeout_slider, LV_ALIGN_OUT_BOTTOM_MID, 0, 15 );
@@ -310,5 +299,6 @@ static void display_timeout_setup_event_cb( lv_obj_t * obj, lv_event_t event ) {
 static void display_rotation_event_handler( lv_obj_t * obj, lv_event_t event ) {
     switch( event ) {
         case( LV_EVENT_VALUE_CHANGED ):     display_set_rotation( lv_dropdown_get_selected( obj ) * 90 );
+                                            bma_set_rotate_tilt( lv_dropdown_get_selected( obj ) * 90 );
     }
 }
