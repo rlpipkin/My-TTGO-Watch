@@ -24,6 +24,8 @@
 #include "config.h"
 #include <Arduino.h>
 #include "esp_bt.h"
+#include "esp_task_wdt.h"
+#include <TTGO.h>
 
 #include "gui/gui.h"
 #include "gui/splashscreen.h"
@@ -36,6 +38,7 @@
 #include "hardware/blectl.h"
 #include "hardware/pmu.h"
 #include "hardware/timesync.h"
+#include "hardware/sound.h"
 
 #include "app/weather/weather.h"
 #include "app/stopwatch/stopwatch_app.h"
@@ -43,6 +46,7 @@
 #include "app/example_app/example_app.h"
 #include "app/osmand/osmand_app.h"
 #include "app/IRController/IRController.h"
+#include "app/powermeter/powermeter_app.h"
 
 TTGOClass *ttgo = TTGOClass::getWatch();
 
@@ -50,6 +54,7 @@ void setup()
 {
     Serial.begin(115200);
     Serial.printf("starting t-watch V1, version: " __FIRMWARE__ "\r\n");
+    Serial.printf("Configure watchdog to 30s: %d\r\n", esp_task_wdt_init( 30, true ) );
     
     ttgo->begin();
     ttgo->lvgl_begin();
@@ -94,6 +99,7 @@ void setup()
     example_app_setup();
     osmand_app_setup();
     IRController_setup();
+    powermeter_app_setup();
     /*
      *
      */
@@ -105,6 +111,8 @@ void setup()
     blectl_setup();
 
     display_set_brightness( display_get_brightness() );
+
+    sound_setup();
 
     delay(500);
 
@@ -120,5 +128,6 @@ void loop()
 {
     delay(5);
     gui_loop();
+    sound_loop();
     powermgm_loop();
 }
