@@ -26,6 +26,7 @@
 #include "powermgm.h"
 #include "motor.h"
 #include "bma.h"
+#include "framebuffer.h"
 #include "gui/gui.h"
 
 #include "json_psram_allocator.h"
@@ -50,8 +51,10 @@ void display_setup( void ) {
     ttgo->tft->setRotation( display_config.rotation / 90 );
     bma_set_rotate_tilt( display_config.rotation );
 
-    powermgm_register_cb( POWERMGM_SILENCE_WAKEUP | POWERMGM_STANDBY | POWERMGM_WAKEUP, display_powermgm_event_cb, "display" );
-    powermgm_register_loop_cb( POWERMGM_WAKEUP, display_powermgm_loop_cb, "display loop" );
+    framebuffer_setup( display_config.use_dma, display_config.use_double_buffering );
+
+    powermgm_register_cb( POWERMGM_SILENCE_WAKEUP | POWERMGM_STANDBY | POWERMGM_WAKEUP, display_powermgm_event_cb, "powermgm display" );
+    powermgm_register_loop_cb( POWERMGM_WAKEUP, display_powermgm_loop_cb, "powermgm display loop" );
 }
 
 bool display_powermgm_event_cb( EventBits_t event, void *arg ) {
@@ -156,6 +159,9 @@ void display_save_config( void ) {
         doc["timeout"] = display_config.timeout;
         doc["block_return_maintile"] = display_config.block_return_maintile;
         doc["background_image"] = display_config.background_image;
+        doc["use_dma"] = display_config.use_dma;
+        doc["use_double_buffering"] = display_config.use_double_buffering;
+        doc["vibe"] = display_config.vibe;
 
         if ( serializeJsonPretty( doc, file ) == 0) {
             log_e("Failed to write config file");
@@ -184,6 +190,9 @@ void display_read_config( void ) {
             display_config.timeout = doc["timeout"] | DISPLAY_MIN_TIMEOUT;
             display_config.block_return_maintile = doc["block_return_maintile"] | false;
             display_config.background_image = doc["background_image"] | 2;
+            display_config.use_dma = doc["use_dma"] | true;
+            display_config.use_double_buffering = doc["use_double_buffering"] | false;
+            display_config.vibe = doc["vibe"] | true;
         }        
         doc.clear();
     }
@@ -217,6 +226,24 @@ bool display_get_block_return_maintile( void ) {
   return( display_config.block_return_maintile );
 }
 
+bool display_get_use_double_buffering( void ) {
+  return( display_config.use_double_buffering );
+}
+
+void display_set_use_double_buffering( bool use_double_buffering ) {
+    display_config.use_double_buffering = use_double_buffering;
+    framebuffer_setup( display_config.use_dma, display_config.use_double_buffering );
+}
+
+bool display_get_use_dma( void ) {
+  return( display_config.use_dma );
+}
+
+void display_set_use_dma( bool use_dma ) {
+    display_config.use_dma = use_dma;
+    framebuffer_setup( display_config.use_dma, display_config.use_double_buffering );
+}
+
 void display_set_block_return_maintile( bool block_return_maintile ) {
   display_config.block_return_maintile = block_return_maintile;
 }
@@ -234,4 +261,13 @@ uint32_t display_get_background_image( void ) {
 
 void display_set_background_image( uint32_t background_image ) {
     display_config.background_image = background_image;
+}
+
+void display_set_vibe( bool vibe ) {
+  display_config.vibe = vibe;
+
+}
+
+bool display_get_vibe( void ) {
+  return display_config.vibe;
 }

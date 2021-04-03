@@ -25,7 +25,8 @@
     #include "callback.h"
 
     #define DISPLAYCTL_BRIGHTNESS       _BV(0)          /** @brief event mask display brightness, callback arg is (uint32_t*) */
-    #define DISPLAYCTL_TIMEOUT          _BV(1)          /** @brief event mask display brightness, callback arg is (uint32_t*) */
+    #define DISPLAYCTL_TIMEOUT          _BV(1)          /** @brief event mask display timeout, callback arg is (bool*) */
+    #define DISPLAYCTL_SCREENSHOT       _BV(2)          /** @brief event mask display screenshot, callback arg is (bool*) */
 
     #define DISPLAY_JSON_CONFIG_FILE    "/display.json" /** @brief defines json config file name */
     
@@ -44,6 +45,9 @@
         uint32_t timeout = DISPLAY_MIN_TIMEOUT;         /** @brief display time out */
         uint32_t rotation = 0;                          /** @brief display rotation */
         bool block_return_maintile = false;             /** @brief block back to main tile on standby */
+        bool use_dma = true;                            /** @brief use dma framebuffer */
+        bool use_double_buffering = false;              /** @brief use double framebuffer */
+        bool vibe = true;                               /** @brief vibe for touch feedback */
         uint32_t background_image = 2;                  /** @brief background image */
     } display_config_t;
 
@@ -86,6 +90,30 @@
      */
     uint32_t display_get_brightness( void );
     /**
+     * @brief read the use DMA from config
+     * 
+     * @return  TRUE if used or false if not used
+     */    
+    bool display_get_use_dma( void );
+    /**
+     * @brief set use DMA for the display
+     * 
+     * @param  use_dma  true for use DMA or false
+     */    
+    void display_set_use_dma( bool use_dma );
+    /**
+     * @brief read the use double buffering from config
+     * 
+     * @return  TRUE if used or false if not used
+     */    
+    bool display_get_use_double_buffering( void );
+    /**
+     * @brief set use use_double_buffering for the display
+     * 
+     * @param  use_double_buffering  true for use_double_buffering or false
+     */    
+    void display_set_use_double_buffering( bool use_double_buffering );
+    /**
      * @brief set brightness for the display
      * 
      * @param brightness brightness from 0-255
@@ -127,6 +155,18 @@
      * @param background_image image number
      */
     void display_set_background_image( uint32_t background_image );
+    /**
+     * @brief set the vibe feedback
+     * 
+     * @param vibe true or false, true for enabling touch feeback
+     */
+    void display_set_vibe( bool vibe );
+    /**
+     * @brief get the vibe feedback
+     * 
+     * @return true is vibe feedback is enabled, false otherwise
+     */
+    bool display_get_vibe( void );
     /**
      * @brief set display into standby
      */

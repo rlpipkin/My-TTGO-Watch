@@ -44,13 +44,14 @@
     } callback_table_t;
 
     /**
-     * @brief callback structure
+     * @brief callback head structure
      */
     typedef struct callback_t {
         uint32_t entrys;                    /** @brief count callback entrys */
+        bool debug;                         /** @brief debug flag, if TRUE to get debug messages */
         callback_table_t *table;            /** @brief pointer to an callback table */
         const char *name;                   /** @brief id for the callback structure */
-        callback_t *next_callback_t;
+        callback_t *next_callback_t;        
     } callback_t;
 
     /**
@@ -98,6 +99,13 @@
      * @param enable    true if logging enabled, false if logging disabled
      */
     void display_event_logging_enable( bool enable );
+    /**
+     * @brief enable/disable SPIFFS event logging
+     * 
+     * @param   callback        pointer to a callback_t structure
+     * @param   debuging        true enable debuging, false disable debuging
+     */
+    void callback_enable_debuging( callback_t *callback, bool debuging );
     void callback_print( void );
 
 #endif // _CALLBACK_H

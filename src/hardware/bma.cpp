@@ -40,8 +40,7 @@ __NOINIT_ATTR uint32_t stepcounter_valid;
 __NOINIT_ATTR uint32_t stepcounter_before_reset;
 __NOINIT_ATTR uint32_t stepcounter;
 
-static char bma_date[16];
-static char bma_old_date[16];
+static struct tm bma_old_date;
 
 bma_config_t bma_config[ BMA_CONFIG_NUM ];
 callback_t *bma_callback = NULL;
@@ -52,6 +51,8 @@ void IRAM_ATTR bma_irq( void );
 bool bma_send_event_cb( EventBits_t event, void *arg );
 bool bma_powermgm_event_cb( EventBits_t event, void *arg );
 bool bma_powermgm_loop_cb( EventBits_t event, void *arg );
+
+static void bma_notify_stepcounter();
 
 void bma_setup( void ) {
     TTGOClass *ttgo = TTGOClass::getWatch();
@@ -80,8 +81,8 @@ void bma_setup( void ) {
 
     bma_reload_settings();
 
-    powermgm_register_cb( POWERMGM_SILENCE_WAKEUP | POWERMGM_STANDBY | POWERMGM_WAKEUP, bma_powermgm_event_cb, "bma" );
-    powermgm_register_loop_cb( POWERMGM_SILENCE_WAKEUP | POWERMGM_STANDBY | POWERMGM_WAKEUP, bma_powermgm_loop_cb, "bma loop" );
+    powermgm_register_cb( POWERMGM_SILENCE_WAKEUP | POWERMGM_STANDBY | POWERMGM_WAKEUP | POWERMGM_ENABLE_INTERRUPTS | POWERMGM_DISABLE_INTERRUPTS , bma_powermgm_event_cb, "powermgm bma" );
+    powermgm_register_loop_cb( POWERMGM_SILENCE_WAKEUP | POWERMGM_STANDBY | POWERMGM_WAKEUP, bma_powermgm_loop_cb, "powermgm bma loop" );
 }
 
 bool bma_powermgm_event_cb( EventBits_t event, void *arg ) {
@@ -92,19 +93,99 @@ bool bma_powermgm_event_cb( EventBits_t event, void *arg ) {
                                         break;
         case POWERMGM_SILENCE_WAKEUP:   bma_wakeup();
                                         break;
+        case POWERMGM_ENABLE_INTERRUPTS:
+                                        attachInterrupt( BMA423_INT1, bma_irq, RISING );
+                                        break;
+        case POWERMGM_DISABLE_INTERRUPTS:
+                                        detachInterrupt( BMA423_INT1 );
+                                        break;
     }
     return( true );
 }
 
 bool bma_powermgm_loop_cb( EventBits_t event , void *arg ) {
-    bma_loop();
+    static bool BMA_tilt = false;
+    static bool BMA_doubleclick = false;
+    static bool BMA_stepcounter = false;
+
+    TTGOClass *ttgo = TTGOClass::getWatch();
+    /*
+     * handle IRQ event
+     */
+    portENTER_CRITICAL(&BMA_IRQ_Mux);
+    bool temp_bma_irq_flag = bma_irq_flag;
+    bma_irq_flag = false;
+    portEXIT_CRITICAL(&BMA_IRQ_Mux);
+
+    /*
+     * check for the event
+     */
+    if ( temp_bma_irq_flag ) {                
+        while( !ttgo->bma->readInterrupt() );
+        /*
+         * set powermgm wakeup event and save BMA_* event
+         */
+        if ( ttgo->bma->isDoubleClick() ) {
+            powermgm_set_event( POWERMGM_WAKEUP_REQUEST );
+            BMA_doubleclick = true;
+        }
+        if ( ttgo->bma->isTilt() ) {
+            powermgm_set_event( POWERMGM_WAKEUP_REQUEST );
+            BMA_tilt = true;
+        }
+        if ( ttgo->bma->isStepCounter() ) {
+            BMA_stepcounter = true;
+        }
+    }
+
+    switch( event ) {
+        case POWERMGM_WAKEUP:   {
+            /*
+             * check if an BMA_* event triggered
+             * one event per loop
+             */
+            if ( BMA_doubleclick ) {
+                BMA_doubleclick = false;
+                bma_send_event_cb( BMACTL_DOUBLECLICK, NULL );
+            }
+            else if ( BMA_tilt ) {
+                BMA_tilt = false;
+                bma_send_event_cb( BMACTL_TILT, NULL );
+            }
+            else if ( BMA_stepcounter ) {
+                BMA_stepcounter = false;
+                bma_notify_stepcounter();
+            }
+            break;
+        }
+    }
+
+    /*
+     *  force update statusbar after restart/boot
+     */
+    if ( first_loop_run ) {
+        first_loop_run = false;
+        bma_notify_stepcounter();
+    }
     return( true );
+}
+
+static void bma_notify_stepcounter() {
+    static uint32_t last_val = 0;
+    TTGOClass *ttgo = TTGOClass::getWatch();
+    stepcounter_before_reset = ttgo->bma->getCounter();
+
+    uint32_t delta = stepcounter + stepcounter_before_reset - last_val;
+    if (delta > 0) {
+        // New val
+        last_val = stepcounter + stepcounter_before_reset;
+        bma_send_event_cb( BMACTL_STEPCOUNTER, &last_val );
+    }
 }
 
 void bma_standby( void ) {
     TTGOClass *ttgo = TTGOClass::getWatch();
     time_t now;
-    tm info;
 
     log_i("go standby");
 
@@ -112,8 +193,7 @@ void bma_standby( void ) {
         ttgo->bma->enableStepCountInterrupt( false );
 
     time( &now );
-    localtime_r( &now, &info );
-    strftime( bma_old_date, sizeof( bma_old_date ), "%d.%b", &info );
+    localtime_r( &now, &bma_old_date );
 
     gpio_wakeup_enable ( (gpio_num_t)BMA423_INT1, GPIO_INTR_HIGH_LEVEL );
     esp_sleep_enable_gpio_wakeup ();
@@ -121,25 +201,30 @@ void bma_standby( void ) {
 
 void bma_wakeup( void ) {
     TTGOClass *ttgo = TTGOClass::getWatch();
-    time_t now;
-    tm info;
 
     log_i("go wakeup");
 
     if ( bma_get_config( BMA_STEPCOUNTER ) )
         ttgo->bma->enableStepCountInterrupt( true );
 
-    time( &now );
-    localtime_r( &now, &info );
-    strftime( bma_date, sizeof( bma_date ), "%d.%b", &info );
-    if ( strcmp( bma_date, bma_old_date ) ) {
-        if ( bma_get_config( BMA_DAILY_STEPCOUNTER ) ) {
-            log_i("reset setcounter: %s != %s", bma_date, bma_old_date );
+    /*
+     * check for a new day and reset stepcounter if configure
+     */
+    if ( bma_get_config( BMA_DAILY_STEPCOUNTER ) ) {
+        time_t now;
+        tm info;
+        time( &now );
+        localtime_r( &now, &info );
+        if ( info.tm_yday != bma_old_date.tm_yday ) {
+            log_i("reset setcounter: %d != %d", info.tm_yday, bma_old_date.tm_yday );
             ttgo->bma->resetStepCounter();
-            strftime( bma_old_date, sizeof( bma_old_date ), "%d.%b", &info );
+            localtime_r( &now, &bma_old_date );
         }
     }
 
+    /*
+     * force bma_powermgm_loop_cb update
+     */
     first_loop_run = true;
 }
 
@@ -156,46 +241,6 @@ void IRAM_ATTR bma_irq( void ) {
     portENTER_CRITICAL_ISR(&BMA_IRQ_Mux);
     bma_irq_flag = true;
     portEXIT_CRITICAL_ISR(&BMA_IRQ_Mux);
-}
-
-void bma_loop( void ) {
-    TTGOClass *ttgo = TTGOClass::getWatch();
-
-    /*
-     * handle IRQ event
-     */
-    portENTER_CRITICAL(&BMA_IRQ_Mux);
-    bool temp_bma_irq_flag = bma_irq_flag;
-    bma_irq_flag = false;
-    portEXIT_CRITICAL(&BMA_IRQ_Mux);
-
-    if ( temp_bma_irq_flag ) {                
-        while( !ttgo->bma->readInterrupt() );
-
-        if ( ttgo->bma->isDoubleClick() ) {
-            powermgm_set_event( POWERMGM_BMA_DOUBLECLICK );
-            bma_send_event_cb( BMACTL_DOUBLECLICK, (void *)"" );
-        }
-        if ( ttgo->bma->isTilt() ) {
-            powermgm_set_event( POWERMGM_BMA_TILT );
-            bma_send_event_cb( BMACTL_TILT, (void *)"" );
-        }
-        if ( ttgo->bma->isStepCounter() ) {
-            stepcounter_before_reset = ttgo->bma->getCounter();
-            char msg[16]="";
-            snprintf( msg, sizeof( msg ),"%d", stepcounter + stepcounter_before_reset );
-            bma_send_event_cb( BMACTL_STEPCOUNTER, (void *)msg );
-        }
-    }
-
-    // force update statusbar after restart/boot
-    if ( first_loop_run ) {
-        first_loop_run = false;
-        stepcounter_before_reset = ttgo->bma->getCounter();
-        char msg[16]="";
-        snprintf( msg, sizeof( msg ),"%d", stepcounter + stepcounter_before_reset );
-        bma_send_event_cb( BMACTL_STEPCOUNTER, msg );
-    }
 }
 
 bool bma_register_cb( EventBits_t event, CALLBACK_FUNC callback_func, const char *id ) {
@@ -313,4 +358,8 @@ void bma_set_rotate_tilt( uint32_t rotation ) {
                     ttgo->bma->set_remap_axes(&remap_data);
                     break;
     }
+}
+
+uint32_t bma_get_stepcounter( void ) {
+    return stepcounter + stepcounter_before_reset;
 }

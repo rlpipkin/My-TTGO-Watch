@@ -22,6 +22,10 @@
 #ifndef _FRAMEBUFFER_H
     #define _FRAMEBUFFER_H
 
-    void framebuffer_setup( void );
+    #define FRAMEBUFFER_BUFFER_W        ( 240 )
+    #define FRAMEBUFFER_BUFFER_H        ( 20 )
+    #define FRAMEBUFFER_BUFFER_SIZE     ( FRAMEBUFFER_BUFFER_W * FRAMEBUFFER_BUFFER_H )
+
+    void framebuffer_setup( bool dma, bool doubleframebuffer );
     
 #endif // _FRAMEBUFFER_H

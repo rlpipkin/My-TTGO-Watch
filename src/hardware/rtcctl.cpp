@@ -60,12 +60,12 @@ callback_t *rtcctl_callback = NULL;
 
 void rtcctl_setup( void ) {
 
-    pinMode( RTC_INT, INPUT_PULLUP);
-    attachInterrupt( RTC_INT, &rtcctl_irq, FALLING );
+    pinMode( RTC_INT_PIN, INPUT_PULLUP);
+    attachInterrupt( RTC_INT_PIN, &rtcctl_irq, FALLING );
 
-    powermgm_register_cb( POWERMGM_SILENCE_WAKEUP | POWERMGM_STANDBY | POWERMGM_WAKEUP, rtcctl_powermgm_event_cb, "rtcctl" );
-    powermgm_register_loop_cb( POWERMGM_SILENCE_WAKEUP | POWERMGM_WAKEUP, rtcctl_powermgm_loop_cb, "rtcctl loop" );
-    timesync_register_cb( TIME_SYNC_OK, rtcctl_timesync_event_cb, "rtcctl timesync" );
+    powermgm_register_cb( POWERMGM_SILENCE_WAKEUP | POWERMGM_STANDBY | POWERMGM_WAKEUP | POWERMGM_ENABLE_INTERRUPTS | POWERMGM_DISABLE_INTERRUPTS , rtcctl_powermgm_event_cb, "powermgm rtcctl" );
+    powermgm_register_loop_cb( POWERMGM_SILENCE_WAKEUP | POWERMGM_STANDBY | POWERMGM_WAKEUP, rtcctl_powermgm_loop_cb, "powermgm rtcctl loop" );
+    timesync_register_cb( TIME_SYNC_OK, rtcctl_timesync_event_cb, "timesync rtcctl" );
 
     rtcctl_load_data();
 }
@@ -162,19 +162,41 @@ void rtcctl_set_next_alarm( void ) {
 bool rtcctl_powermgm_event_cb( EventBits_t event, void *arg ) {
     switch( event ) {
         case POWERMGM_STANDBY:          log_i("go standby");
-                                        gpio_wakeup_enable( (gpio_num_t)RTC_INT, GPIO_INTR_LOW_LEVEL );
+                                        gpio_wakeup_enable( (gpio_num_t)RTC_INT_PIN, GPIO_INTR_LOW_LEVEL );
                                         esp_sleep_enable_gpio_wakeup ();
                                         break;
         case POWERMGM_WAKEUP:           log_i("go wakeup");
                                         break;
         case POWERMGM_SILENCE_WAKEUP:   log_i("go silence wakeup");
                                         break;
+        case POWERMGM_ENABLE_INTERRUPTS:
+                                        attachInterrupt( RTC_INT_PIN, &rtcctl_irq, FALLING );
+                                        break;
+        case POWERMGM_DISABLE_INTERRUPTS:
+                                        detachInterrupt( RTC_INT_PIN );
+                                        break;
     }
     return( true );
 }
 
+void IRAM_ATTR rtcctl_irq( void ) {
+    portENTER_CRITICAL_ISR(&RTC_IRQ_Mux);
+    rtc_irq_flag = true;
+    portEXIT_CRITICAL_ISR(&RTC_IRQ_Mux);
+}
+
 bool rtcctl_powermgm_loop_cb( EventBits_t event, void *arg ) {
-    rtcctl_loop();
+    portENTER_CRITICAL( &RTC_IRQ_Mux );
+    bool temp_rtc_irq_flag = rtc_irq_flag;
+    rtc_irq_flag = false;
+    portEXIT_CRITICAL( &RTC_IRQ_Mux );
+
+    if ( temp_rtc_irq_flag ) {
+        /*
+        * fire callback
+        */
+        rtcctl_send_event_cb( RTCCTL_ALARM_OCCURRED );
+    }
     return( true );
 }
 
@@ -185,26 +207,6 @@ bool rtcctl_timesync_event_cb( EventBits_t event, void *arg ) {
             break;
     }
     return( true );
-}
-
-void IRAM_ATTR rtcctl_irq( void ) {
-    portENTER_CRITICAL_ISR(&RTC_IRQ_Mux);
-    rtc_irq_flag = true;
-    portEXIT_CRITICAL_ISR(&RTC_IRQ_Mux);
-    powermgm_set_event( POWERMGM_RTC_ALARM );
-}
-
-void rtcctl_loop( void ) {
-    // fire callback
-    if ( !powermgm_get_event( POWERMGM_STANDBY ) ) {
-        portENTER_CRITICAL( &RTC_IRQ_Mux );
-        bool temp_rtc_irq_flag = rtc_irq_flag;
-        rtc_irq_flag = false;
-        portEXIT_CRITICAL( &RTC_IRQ_Mux );
-        if ( temp_rtc_irq_flag ) {
-            rtcctl_send_event_cb( RTCCTL_ALARM_OCCURRED );
-        }
-    }
 }
 
 bool rtcctl_register_cb( EventBits_t event, CALLBACK_FUNC callback_func, const char *id ) {

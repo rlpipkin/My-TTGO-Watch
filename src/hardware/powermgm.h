@@ -31,12 +31,11 @@
     #define POWERMGM_SILENCE_WAKEUP_REQUEST     _BV(3)         /** @brief event mask for powermgm wakeup silence request */
     #define POWERMGM_WAKEUP                     _BV(4)         /** @brief event mask for powermgm wakeup */
     #define POWERMGM_WAKEUP_REQUEST             _BV(5)         /** @brief event mask for powermgm wakeup request */
-    #define POWERMGM_PMU_BUTTON                 _BV(6)         /** @brief event mask for powermgm pmu button is pressed */
-    #define POWERMGM_BMA_DOUBLECLICK            _BV(9)         /** @brief event mask for powermgm bma soubleclick */
-    #define POWERMGM_BMA_TILT                   _BV(10)        /** @brief event mask for powermgm bma tilt */
-    #define POWERMGM_RTC_ALARM                  _BV(11)        /** @brief event mask for powermgm rtc alarm */
+    #define POWERMGM_POWER_BUTTON               _BV(6)         /** @brief event mask for powermgm pmu button is pressed */
     #define POWERMGM_SHUTDOWN                   _BV(12)        /** @brief event mask for powermgm shutdown */
     #define POWERMGM_RESET                      _BV(13)        /** @brief event mask for powermgm reset */
+    #define POWERMGM_DISABLE_INTERRUPTS         _BV(15)        
+    #define POWERMGM_ENABLE_INTERRUPTS          _BV(16)        
     
     /**
      * @brief setp power managment, coordinate managment beween CPU, wifictl, pmu, bma, display, backlight and lvgl
@@ -72,6 +71,10 @@
      * @param   event               possible values: POWERMGM_STANDBY, POWERMGM_SILENCE_WAKEUP, POWERMGM_WAKEUP and POWERMGM_RTC_ALARM
      * @param   callback_func       pointer to the callback function 
      * @param   id                  pointer to an string
+     * 
+     * @return  TRUE if successful, FALSE if not successful
+     * 
+     * @note  Your callback function return TRUE if all fine, FALSE when you want break, by example into to standby.
      */
     bool powermgm_register_cb( EventBits_t event, CALLBACK_FUNC callback_func, const char *id );
     /**
@@ -82,5 +85,13 @@
      * @param   id                  pointer to an string
      */
     bool powermgm_register_loop_cb( EventBits_t event, CALLBACK_FUNC callback_func, const char *id );
+    /**
+     * @brief send an interrupt disable request
+     */
+    void powermgm_disable_interrupts( void );
+    /**
+     * @brief send an interrupt enable request
+     */
+    void powermgm_enable_interrupts( void );
 
 #endif // _POWERMGM_H

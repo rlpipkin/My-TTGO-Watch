@@ -7,16 +7,19 @@
     #define HTTP_OTA_FINISH         _BV(1)      /** @brief http ota finish event mask, callback arg is (char*) */
     #define HTTP_OTA_ERROR          _BV(2)      /** @brief http ota error event mask, callback arg is (char*) */
     #define HTTP_OTA_PROGRESS       _BV(3)      /** @brief http ota progress event mask, callback arg is (int16_t*) */
+    #define HTTP_OTA_DATARATE       _BV(4)      /** @brief http ota progress event mask, callback arg is (int16_t*) */
 	
+    #define HTTP_OTA_BUFFER_SIZE    ( 512 * 1 )
     /**
      * @brief   start an http ota update
      * 
      * @param   url     pointer to an url
      * @param   md5     pointer to an md5 hash
+     * @param   size    size in bytes or 0 if unknown
      * 
      * @return  true if success or false if failed
      */
-    bool http_ota_start( const char* url, const char* md5 );
+    bool http_ota_start( const char* url, const char* md5, int32_t firmwaresize );
     /**
      * @brief register an callback function for an http_ota event
      * 

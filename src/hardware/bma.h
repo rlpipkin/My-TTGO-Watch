@@ -53,10 +53,6 @@
      */
     void bma_setup( void );
     /**
-     * @brief loop function for activity measurement
-     */
-    void bma_loop( void );
-    /**
      * @brief put bma into standby, depending on ther config
      */
     void bma_standby( void );
@@ -105,5 +101,11 @@
      * @return  true if success, false if failed
      */
     bool bma_register_cb( EventBits_t event, CALLBACK_FUNC callback_func, const char *id );
-
+    /**
+     * @brief return the current step counter value
+     *
+     * @return steps from the stepcounter as uint32_t value
+     */
+    uint32_t bma_get_stepcounter( void );
+    
 #endif // _BMA_H

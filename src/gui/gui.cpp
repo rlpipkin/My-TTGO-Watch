@@ -25,6 +25,7 @@
 
 #include "gui.h"
 #include "statusbar.h"
+#include "quickbar.h"
 #include "screenshot.h"
 #include "keyboard.h"
 
@@ -47,6 +48,7 @@
 
 #include "hardware/powermgm.h"
 #include "hardware/display.h"
+#include "hardware/motor.h"
 
 lv_obj_t *img_bin;
 
@@ -60,6 +62,7 @@ void gui_setup( void )
     lv_obj_set_width( img_bin, lv_disp_get_hor_res( NULL ) );
     lv_obj_set_height( img_bin, lv_disp_get_ver_res( NULL ) );
     lv_obj_align( img_bin, NULL, LV_ALIGN_CENTER, 0, 0 );
+
     mainbar_setup();
     /* add the four mainbar screens */
     main_tile_setup();
@@ -67,6 +70,11 @@ void gui_setup( void )
     note_tile_setup();
     setup_tile_setup();
 
+    statusbar_setup();
+    quickbar_setup();
+    keyboard_setup();
+    num_keyboard_setup();
+    
     /* add setup */
     battery_settings_tile_setup();
     display_settings_tile_setup();
@@ -78,13 +86,9 @@ void gui_setup( void )
     utilities_tile_setup();
     sound_settings_tile_setup();
 
-    statusbar_setup();
     lv_disp_trig_activity( NULL );
 
     gui_set_background_image( display_get_background_image() );
-
-    keyboard_setup();
-    num_keyboard_setup();
 
     powermgm_register_cb( POWERMGM_STANDBY | POWERMGM_WAKEUP | POWERMGM_SILENCE_WAKEUP, gui_powermgm_event_cb, "gui" );
     powermgm_register_loop_cb( POWERMGM_WAKEUP | POWERMGM_SILENCE_WAKEUP, gui_powermgm_loop_event_cb, "gui loop" );
@@ -108,6 +112,12 @@ bool gui_powermgm_event_cb( EventBits_t event, void *arg ) {
                                         ttgo->startLvglTick();
                                         lv_disp_trig_activity( NULL );
                                         break;
+        case POWERMGM_DISABLE_INTERRUPTS:
+                                        TTGOClass::getWatch()->stopLvglTick();
+                                        break;
+        case POWERMGM_ENABLE_INTERRUPTS:
+                                        TTGOClass::getWatch()->startLvglTick();
+                                        break;                                        
     }
     return( true );
 }

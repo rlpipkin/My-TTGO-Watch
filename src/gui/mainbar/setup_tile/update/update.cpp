@@ -30,6 +30,7 @@
 
 #include "gui/mainbar/mainbar.h"
 #include "gui/mainbar/setup_tile/setup_tile.h"
+#include "gui/mainbar/setup_tile/bluetooth_settings/bluetooth_message.h"
 #include "gui/statusbar.h"
 #include "gui/setup.h"
 
@@ -49,7 +50,8 @@ icon_t *update_setup_icon = NULL;
 lv_obj_t *update_settings_tile=NULL;
 lv_style_t update_settings_style;
 uint32_t update_tile_num;
-static int16_t progress = 0;
+static float progress = 0;
+static int64_t last_firmware_version = 0;
 
 lv_obj_t *update_btn = NULL;
 lv_obj_t *update_status_label = NULL;
@@ -76,6 +78,7 @@ LV_IMG_DECLARE(update_64px);
 LV_IMG_DECLARE(info_1_16px);
 
 void update_tile_setup( void ) {
+    last_firmware_version = atol( __FIRMWARE__ );
     // get an app tile and copy mainstyle
     update_tile_num = mainbar_add_app_tile( 1, 2, "update setup" );
     update_settings_tile = mainbar_get_tile_obj( update_tile_num );
@@ -147,7 +150,7 @@ void update_tile_setup( void ) {
     lv_bar_set_value( update_progressbar, 0, LV_ANIM_ON );
 
     wifictl_register_cb( WIFICTL_CONNECT, update_wifictl_event_cb, "update" );
-    http_ota_register_cb( HTTP_OTA_PROGRESS | HTTP_OTA_ERROR, update_http_ota_event_cb, "http updater");
+    http_ota_register_cb( HTTP_OTA_PROGRESS | HTTP_OTA_START | HTTP_OTA_FINISH | HTTP_OTA_ERROR, update_http_ota_event_cb, "http updater");
 
     mainbar_add_tile_activate_cb( update_tile_num, update_update_activate_cb );
     mainbar_add_tile_hibernate_cb( update_tile_num, update_update_hibernate_cb );
@@ -157,7 +160,7 @@ void update_tile_setup( void ) {
 }
 
 void update_update_activate_cb( void ) {
-    _update_progress_task = lv_task_create( update_progress_task, 1000,  LV_TASK_PRIO_LOWEST, NULL );
+    _update_progress_task = lv_task_create( update_progress_task, 250,  LV_TASK_PRIO_LOWEST, NULL );
 }
 
 void update_update_hibernate_cb( void ) {
@@ -167,8 +170,8 @@ void update_update_hibernate_cb( void ) {
 void update_progress_task( lv_task_t *task ) {
     if ( progress > 0 ) {
         char msg[16]="";
-        lv_bar_set_value( update_progressbar, progress , LV_ANIM_ON );
-        snprintf( msg, sizeof( msg ), "%d%%", progress );
+        lv_bar_set_value( update_progressbar, progress, LV_ANIM_ON );
+        snprintf( msg, sizeof( msg ), "%.0f%%", progress );
         lv_label_set_text( update_status_label, msg );
         lv_obj_align( update_status_label, update_btn, LV_ALIGN_OUT_BOTTOM_MID, 0, 5 );
     }
@@ -178,9 +181,23 @@ void update_progress_task( lv_task_t *task ) {
 bool update_http_ota_event_cb( EventBits_t event, void *arg ) {
     switch( event ) {
         case HTTP_OTA_PROGRESS:
-            progress = *(int16_t *)arg;
+            progress = *(float *)arg;
             break;
-        case HTTP_OTA_ERROR:        
+        case HTTP_OTA_START:        
+            statusbar_show_icon( STATUSBAR_WARNING );
+            statusbar_style_icon( STATUSBAR_WARNING, STATUSBAR_STYLE_YELLOW );   
+            lv_label_set_text( update_status_label, (char *)arg );
+            lv_obj_align( update_status_label, update_btn, LV_ALIGN_OUT_BOTTOM_MID, 0, 5 );
+            break;
+        case HTTP_OTA_FINISH:        
+            statusbar_show_icon( STATUSBAR_WARNING );
+            statusbar_style_icon( STATUSBAR_WARNING, STATUSBAR_STYLE_GREEN );   
+            lv_label_set_text( update_status_label, (char *)arg );
+            lv_obj_align( update_status_label, update_btn, LV_ALIGN_OUT_BOTTOM_MID, 0, 5 );
+            break;
+        case HTTP_OTA_ERROR:
+            statusbar_show_icon( STATUSBAR_WARNING );
+            statusbar_style_icon( STATUSBAR_WARNING, STATUSBAR_STYLE_RED );   
             lv_label_set_text( update_status_label, (char *)arg );
             lv_obj_align( update_status_label, update_btn, LV_ALIGN_OUT_BOTTOM_MID, 0, 5 );
             break;
@@ -243,9 +260,9 @@ static void update_event_handler(lv_obj_t * obj, lv_event_t event) {
             xEventGroupSetBits( update_event_handle, UPDATE_REQUEST );
             xTaskCreate(    update_Task,
                             "update Task",
-                            10000,
+                            5000,
                             NULL,
-                            0,
+                            1,
                             &_update_Task );
         }
     }
@@ -277,6 +294,10 @@ void update_Task( void * pvParameters ) {
             lv_label_set_text( update_status_label, (const char*)version_msg );
             lv_obj_align( update_status_label, update_btn, LV_ALIGN_OUT_BOTTOM_MID, 0, 5 );
             setup_set_indicator( update_setup_icon, ICON_INDICATOR_1 );
+            if ( last_firmware_version < firmware_version ) {
+                bluetooth_message_queue_msg("{\"t\":\"notify\",\"id\":1575479849,\"src\":\"Update\",\"title\":\"update\",\"body\":\"new firmware version available\"}");
+                last_firmware_version = firmware_version;
+            }
         }
         else if ( firmware_version == atol( __FIRMWARE__ ) ) {
             lv_label_set_text( update_status_label, "yeah! up to date ..." );
@@ -291,15 +312,12 @@ void update_Task( void * pvParameters ) {
         lv_obj_invalidate( lv_scr_act() );
     }
     if ( ( xEventGroupGetBits( update_event_handle) & UPDATE_REQUEST ) && ( update_get_url() != NULL ) ) {
-        if( WiFi.status() == WL_CONNECTED ) {
+        if( ( WiFi.status() == WL_CONNECTED ) ) {
 
             uint32_t display_timeout = display_get_timeout();
             display_set_timeout( DISPLAY_MAX_TIMEOUT );
 
-            lv_label_set_text( update_status_label, "start update ..." );
-            lv_obj_align( update_status_label, update_btn, LV_ALIGN_OUT_BOTTOM_MID, 0, 5 );
-
-            if ( http_ota_start( update_get_url(), update_get_md5() ) ) {
+            if ( http_ota_start( update_get_url(), update_get_md5(), update_get_size() ) ) {
                 reset = true;
                 progress = 0;
                 lv_label_set_text( update_status_label, "update ok, turn off and on!" );
@@ -307,7 +325,7 @@ void update_Task( void * pvParameters ) {
                 lv_label_set_text( update_btn_label, "restart");
             }
             progress = 0;
-            lv_bar_set_value( update_progressbar, 0 , LV_ANIM_ON );            
+            lv_bar_set_value( update_progressbar, 0 , LV_ANIM_ON );
             display_set_timeout( display_timeout );
             powermgm_set_event( POWERMGM_WAKEUP_REQUEST );
         }

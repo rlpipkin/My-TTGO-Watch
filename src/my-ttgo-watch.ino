@@ -39,7 +39,6 @@
 #include "hardware/pmu.h"
 #include "hardware/timesync.h"
 #include "hardware/sound.h"
-#include "hardware/framebuffer.h"
 #include "hardware/callback.h"
 
 #include "app/weather/weather.h"
@@ -49,7 +48,10 @@
 #include "app/example_app/example_app.h"
 #include "app/osmand/osmand_app.h"
 #include "app/IRController/IRController.h"
+#include "app/fx_rates/fx_rates.h"
+#include "app/activity/activity.h"
 #include "app/powermeter/powermeter_app.h"
+#include "app/FindPhone/FindPhone.h"
 
 TTGOClass *ttgo = TTGOClass::getWatch();
 
@@ -65,8 +67,6 @@ void setup()
     SPIFFS.begin();
     motor_setup();
 
-    // force to store all new heap allocations in psram to get more internal ram
-    heap_caps_malloc_extmem_enable( 1 );
     display_setup();
     screenshot_setup();
 
@@ -100,19 +100,20 @@ void setup()
     weather_app_setup();
     stopwatch_app_setup();
     alarm_clock_setup();
+    activity_app_setup();
     crypto_ticker_setup();
     example_app_setup();
     osmand_app_setup();
     IRController_setup();
+    fxrates_app_setup();
     powermeter_app_setup();
-    /*
+	FindPhone_setup();
+  	/*
      *
      */
     if ( wifictl_get_autoon() && ( pmu_is_charging() || pmu_is_vbus_plug() || ( pmu_get_battery_voltage() > 3400) ) )
         wifictl_on();
 
-    // enable to store data in normal heap
-    heap_caps_malloc_extmem_enable( 16*1024 );
     blectl_setup();
     sound_setup();
 
